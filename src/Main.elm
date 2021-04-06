@@ -6,6 +6,7 @@ import Html exposing (Attribute, Html, a, div, h1, text)
 import Html.Attributes exposing (href)
 import Notes.Notes as Notes
 import Platform.Cmd exposing (Cmd)
+import Timeline.Timeline as Timeline exposing (Timeline)
 import Url exposing (Url)
 import Url.Parser as Parser exposing ((</>))
 
@@ -36,6 +37,7 @@ type Route
 type alias Model =
     { page : Page
     , navKey : Nav.Key
+    , timelines : List Timeline
     }
 
 
@@ -51,7 +53,7 @@ init _ url navKey =
         route =
             Parser.parse urlParser url
     in
-    routeToPage { page = TitlePage, navKey = navKey } route
+    routeToPage { page = TitlePage, navKey = navKey, timelines = Timeline.data } route
 
 
 urlParser : Parser.Parser (Route -> c) c
