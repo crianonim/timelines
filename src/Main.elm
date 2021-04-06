@@ -102,7 +102,7 @@ update msg model =
                     ( model, Nav.pushUrl model.navKey (Url.toString url) )
 
                 Browser.External urlString ->
-                    ( model, Cmd.none )
+                    ( model, Nav.load urlString )
 
         ChangedUrl url ->
             Parser.parse urlParser url |> routeToPage model
@@ -141,6 +141,7 @@ view model =
                                 Timeline.viewTimeline
                                 model.timelines
                             )
+                        , div [] [ a [ href "https://github.com/crianonim/timelines" ] [ text "Github repo" ] ]
                         ]
 
                 BadPage ->
