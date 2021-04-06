@@ -50,9 +50,6 @@ init _ url navKey =
     let
         route =
             Parser.parse urlParser url
-
-        _ =
-            Debug.log "ROUTE" route
     in
     routeToPage { page = TitlePage, navKey = navKey } route
 
@@ -137,6 +134,11 @@ view model =
                             [ text "Welcome to Timelines"
                             ]
                         , a [ href "notes" ] [ text "Notes" ]
+                        , div []
+                            (List.map
+                                Timeline.viewTimeline
+                                model.timelines
+                            )
                         ]
 
                 BadPage ->
