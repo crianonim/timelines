@@ -1,9 +1,9 @@
 <!DOCTYPE HTML>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>Main</title>
-    <style>body { padding: 0; margin: 0; }</style>
+  <meta charset="UTF-8">
+  <title>Main</title>
+  <style>body { padding: 0; margin: 0; }</style>
 </head>
 
 <body>
@@ -10749,7 +10749,43 @@ var $elm$core$Basics$never = function (_v0) {
 };
 var $elm$browser$Browser$application = _Browser_application;
 var $author$project$Main$TitlePage = {$: 'TitlePage'};
-var $elm$core$Debug$log = _Debug_log;
+var $author$project$Timeline$Timeline$Closed = F2(
+	function (a, b) {
+		return {$: 'Closed', a: a, b: b};
+	});
+var $author$project$Timeline$Timeline$Point = function (a) {
+	return {$: 'Point', a: a};
+};
+var $author$project$Timeline$Timeline$Started = function (a) {
+	return {$: 'Started', a: a};
+};
+var $author$project$Timeline$Timeline$Timeline = F2(
+	function (period, name) {
+		return {name: name, period: period};
+	});
+var $author$project$Timeline$Timeline$data = _List_fromArray(
+	[
+		A2(
+		$author$project$Timeline$Timeline$Timeline,
+		$author$project$Timeline$Timeline$Point(1980),
+		'Jan\'s Birthday'),
+		A2(
+		$author$project$Timeline$Timeline$Timeline,
+		A2($author$project$Timeline$Timeline$Closed, 1995, 1999),
+		'High School'),
+		A2(
+		$author$project$Timeline$Timeline$Timeline,
+		$author$project$Timeline$Timeline$Started(2019),
+		'Working in Permutive'),
+		A2(
+		$author$project$Timeline$Timeline$Timeline,
+		$author$project$Timeline$Timeline$Started(1952),
+		'Queen Elizabeth II reign'),
+		A2(
+		$author$project$Timeline$Timeline$Timeline,
+		$author$project$Timeline$Timeline$Started(2005),
+		'Moved to the UK')
+	]);
 var $elm$url$Url$Parser$State = F5(
 	function (visited, unvisited, params, frag, value) {
 		return {frag: frag, params: params, unvisited: unvisited, value: value, visited: visited};
@@ -11410,10 +11446,9 @@ var $author$project$Main$urlParser = $elm$url$Url$Parser$oneOf(
 var $author$project$Main$init = F3(
 	function (_v0, url, navKey) {
 		var route = A2($elm$url$Url$Parser$parse, $author$project$Main$urlParser, url);
-		var _v1 = A2($elm$core$Debug$log, 'ROUTE', route);
 		return A2(
 			$author$project$Main$routeToPage,
-			{navKey: navKey, page: $author$project$Main$TitlePage},
+			{navKey: navKey, page: $author$project$Main$TitlePage, timelines: $author$project$Timeline$Timeline$data},
 			route);
 	});
 var $elm$core$Platform$Sub$batch = _Platform_batch;
@@ -11421,6 +11456,7 @@ var $elm$core$Platform$Sub$none = $elm$core$Platform$Sub$batch(_List_Nil);
 var $author$project$Main$subscriptions = function (model) {
 	return $elm$core$Platform$Sub$none;
 };
+var $elm$browser$Browser$Navigation$load = _Browser_load;
 var $elm$browser$Browser$Navigation$pushUrl = _Browser_pushUrl;
 var $elm$url$Url$addPort = F2(
 	function (maybePort, starter) {
@@ -11485,6 +11521,7 @@ var $author$project$Notes$ListNotes$update = F2(
 			}
 		}
 	});
+var $elm$core$Debug$log = _Debug_log;
 var $author$project$Notes$ViewNote$update = F2(
 	function (msg, model) {
 		var _v0 = A2($elm$core$Debug$log, 'ms', msg);
@@ -11570,7 +11607,9 @@ var $author$project$Main$update = F2(
 							$elm$url$Url$toString(url)));
 				} else {
 					var urlString = urlReq.a;
-					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+					return _Utils_Tuple2(
+						model,
+						$elm$browser$Browser$Navigation$load(urlString));
 				}
 			default:
 				var url = msg.a;
@@ -11580,6 +11619,121 @@ var $author$project$Main$update = F2(
 					A2($elm$url$Url$Parser$parse, $author$project$Main$urlParser, url));
 		}
 	});
+var $author$project$Timeline$Timeline$highEndFramed = F2(
+	function (frame, p) {
+		switch (p.$) {
+			case 'Point':
+				var year = p.a;
+				return year;
+			case 'Closed':
+				var year = p.b;
+				return year;
+			default:
+				return frame;
+		}
+	});
+var $author$project$Timeline$Timeline$lowEnd = function (p) {
+	switch (p.$) {
+		case 'Point':
+			var year = p.a;
+			return year;
+		case 'Closed':
+			var start = p.a;
+			return start;
+		default:
+			var year = p.a;
+			return year;
+	}
+};
+var $author$project$Timeline$Timeline$bothEndsFramed = F2(
+	function (frame, p) {
+		return _Utils_Tuple2(
+			$author$project$Timeline$Timeline$lowEnd(p),
+			A2($author$project$Timeline$Timeline$highEndFramed, frame, p));
+	});
+var $elm$core$Tuple$mapBoth = F3(
+	function (funcA, funcB, _v0) {
+		var x = _v0.a;
+		var y = _v0.b;
+		return _Utils_Tuple2(
+			funcA(x),
+			funcB(y));
+	});
+var $author$project$Timeline$Timeline$timeLineExtent = F3(
+	function (wholeStart, wholeEnd, _v0) {
+		var period = _v0.period;
+		var wholeDuration = wholeEnd - wholeStart;
+		var proportion = function (x) {
+			return x / wholeDuration;
+		};
+		var _v1 = A2($author$project$Timeline$Timeline$bothEndsFramed, 2021, period);
+		var start = _v1.a;
+		var end = _v1.b;
+		var duration = end - start;
+		var relStart = start - wholeStart;
+		var _v2 = A2(
+			$elm$core$Debug$log,
+			'start',
+			_List_fromArray(
+				[wholeStart, wholeEnd, start, end]));
+		return A3(
+			$elm$core$Tuple$mapBoth,
+			proportion,
+			proportion,
+			_Utils_Tuple2(relStart, duration));
+	});
+var $elm$core$Basics$min = F2(
+	function (x, y) {
+		return (_Utils_cmp(x, y) < 0) ? x : y;
+	});
+var $author$project$Timeline$Timeline$timeLinesPeriod = function (tls) {
+	return A3(
+		$elm$core$List$foldl,
+		F2(
+			function (period, _v0) {
+				var s1 = _v0.a;
+				var s2 = _v0.b;
+				var _v1 = A2($author$project$Timeline$Timeline$bothEndsFramed, 2021, period);
+				var low = _v1.a;
+				var high = _v1.b;
+				return _Utils_Tuple2(
+					A2($elm$core$Basics$min, s1, low),
+					A2($elm$core$Basics$max, s2, high));
+			}),
+		_Utils_Tuple2(5000, -5000),
+		A2(
+			$elm$core$List$map,
+			function ($) {
+				return $.period;
+			},
+			tls));
+};
+var $author$project$Timeline$Timeline$timeLinesViewport = F2(
+	function (_v0, _v1) {
+		var vStart = _v0.a;
+		var vEnd = _v0.b;
+		var start = _v1.a;
+		var end = _v1.b;
+		return _Utils_Tuple2(
+			A2($elm$core$Basics$min, vStart, start),
+			A2($elm$core$Basics$max, vEnd, end));
+	});
+var $author$project$Timeline$Timeline$example = function () {
+	var _v0 = A2(
+		$author$project$Timeline$Timeline$timeLinesViewport,
+		_Utils_Tuple2(1900, 2021),
+		$author$project$Timeline$Timeline$timeLinesPeriod($author$project$Timeline$Timeline$data));
+	var start = _v0.a;
+	var end = _v0.b;
+	return A2(
+		$elm$core$List$map,
+		function (t) {
+			return _Utils_Tuple2(
+				t,
+				A3($author$project$Timeline$Timeline$timeLineExtent, start, end, t));
+		},
+		$author$project$Timeline$Timeline$data);
+}();
 var $elm$html$Html$h1 = _VirtualDom_node('h1');
 var $elm$core$List$singleton = function (value) {
 	return _List_fromArray(
@@ -11686,6 +11840,60 @@ var $author$project$Notes$Notes$view = function (model) {
 			return $elm$html$Html$text('BAD PAGE');
 	}
 };
+var $author$project$Timeline$Timeline$viewBar = F3(
+	function (_v0, _v1, width) {
+		var name = _v0.name;
+		var start = _v1.a;
+		var length = _v1.b;
+		return A2(
+			$elm$html$Html$div,
+			_List_fromArray(
+				[
+					A2(
+					$elm$html$Html$Attributes$style,
+					'margin-left',
+					$elm$core$String$fromFloat(start * width) + 'px'),
+					A2(
+					$elm$html$Html$Attributes$style,
+					'width',
+					$elm$core$String$fromFloat(length * width) + 'px'),
+					A2($elm$html$Html$Attributes$style, 'background-color', 'blue'),
+					A2($elm$html$Html$Attributes$style, 'height', '1em'),
+					A2($elm$html$Html$Attributes$style, 'border', '1px solid black'),
+					$elm$html$Html$Attributes$title(name)
+				]),
+			_List_Nil);
+	});
+var $author$project$Timeline$Timeline$toString = function (_v0) {
+	var period = _v0.period;
+	var name = _v0.name;
+	return _Utils_ap(
+		name,
+		function () {
+			switch (period.$) {
+				case 'Point':
+					var year = period.a;
+					return $elm$core$String$fromInt(year);
+				case 'Closed':
+					var from = period.a;
+					var to = period.b;
+					return $elm$core$String$fromInt(from) + (' - ' + $elm$core$String$fromInt(to));
+				default:
+					var startYear = period.a;
+					return $elm$core$String$fromInt(startYear) + ' - ';
+			}
+		}());
+};
+var $author$project$Timeline$Timeline$viewTimeline = function (tl) {
+	return A2(
+		$elm$html$Html$div,
+		_List_Nil,
+		_List_fromArray(
+			[
+				$elm$html$Html$text(
+				$author$project$Timeline$Timeline$toString(tl))
+			]));
+};
 var $author$project$Main$view = function (model) {
 	return {
 		body: $elm$core$List$singleton(
@@ -11720,7 +11928,38 @@ var $author$project$Main$view = function (model) {
 									_List_fromArray(
 										[
 											$elm$html$Html$text('Notes')
-										]))
+										])),
+									A2(
+									$elm$html$Html$div,
+									_List_Nil,
+									A2($elm$core$List$map, $author$project$Timeline$Timeline$viewTimeline, model.timelines)),
+									A2(
+									$elm$html$Html$div,
+									_List_Nil,
+									_List_fromArray(
+										[
+											A2(
+											$elm$html$Html$a,
+											_List_fromArray(
+												[
+													$elm$html$Html$Attributes$href('https://github.com/crianonim/timelines')
+												]),
+											_List_fromArray(
+												[
+													$elm$html$Html$text('Github repo')
+												]))
+										])),
+									A2(
+									$elm$html$Html$div,
+									_List_Nil,
+									A2(
+										$elm$core$List$map,
+										function (_v1) {
+											var t = _v1.a;
+											var e = _v1.b;
+											return A3($author$project$Timeline$Timeline$viewBar, t, e, 500);
+										},
+										$author$project$Timeline$Timeline$example))
 								]));
 					default:
 						return $elm$html$Html$text('BAD PAGE');
@@ -11747,8 +11986,6 @@ catch (e)
   pre.innerText = e;
   throw e;
 }
-
-
 </script>
 
 </body>

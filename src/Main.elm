@@ -3,7 +3,7 @@ module Main exposing (main)
 import Browser exposing (Document)
 import Browser.Navigation as Nav
 import Html exposing (Attribute, Html, a, div, h1, text)
-import Html.Attributes exposing (href)
+import Html.Attributes exposing (href, style)
 import Notes.Notes as Notes
 import Platform.Cmd exposing (Cmd)
 import Timeline.Timeline as Timeline exposing (Timeline)
@@ -142,6 +142,7 @@ view model =
                                 model.timelines
                             )
                         , div [] [ a [ href "https://github.com/crianonim/timelines" ] [ text "Github repo" ] ]
+                        , div [] (List.map (\( t, e ) -> Timeline.viewBar t e 500) Timeline.example)
                         ]
 
                 BadPage ->
