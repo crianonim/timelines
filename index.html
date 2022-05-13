@@ -5396,9 +5396,13 @@ var $author$project$Timeline$Timeline$data = _List_fromArray(
 		A2(
 		$author$project$Timeline$Timeline$Timeline,
 		A2($author$project$Timeline$Timeline$Closed, 1789, 1795),
-		'French Revolution')
+		'French Revolution'),
+		A2(
+		$author$project$Timeline$Timeline$Timeline,
+		A2($author$project$Timeline$Timeline$Closed, 2014, 2018),
+		'Lived in Clapham')
 	]);
-var $author$project$Timeline$Timeline$exampleVP = {end: 2021, start: 1980};
+var $author$project$Timeline$Timeline$exampleVP = {end: 2022, start: 1970};
 var $elm$url$Url$Parser$State = F5(
 	function (visited, unvisited, params, frag, value) {
 		return {frag: frag, params: params, unvisited: unvisited, value: value, visited: visited};
@@ -6942,8 +6946,40 @@ var $elm$core$List$singleton = function (value) {
 	return _List_fromArray(
 		[value]);
 };
+var $elm$virtual_dom$VirtualDom$style = _VirtualDom_style;
+var $elm$html$Html$Attributes$style = $elm$virtual_dom$VirtualDom$style;
 var $elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
 var $elm$html$Html$text = $elm$virtual_dom$VirtualDom$text;
+var $author$project$Timeline$Timeline$timelineToTimelineBar = F3(
+	function (_v0, width, tl) {
+		var start = _v0.start;
+		var end = _v0.end;
+		var period = tl.period;
+		var name = tl.name;
+		var viewPortYears = end - start;
+		var scale = width / viewPortYears;
+		var _v1 = function () {
+			switch (period.$) {
+				case 'Point':
+					var year = period.a;
+					return _Utils_Tuple2(year, year);
+				case 'Closed':
+					var y1 = period.a;
+					var y2 = period.b;
+					return _Utils_Tuple2(y1, y2);
+				default:
+					var year = period.a;
+					return _Utils_Tuple2(year, end);
+			}
+		}();
+		var yearStart = _v1.a;
+		var yearEnd = _v1.b;
+		return {
+			length: (yearEnd - A2($elm$core$Basics$max, yearStart, start)) * scale,
+			start: (_Utils_cmp(start, yearStart) > 0) ? $elm$core$Maybe$Nothing : $elm$core$Maybe$Just((yearStart - start) * scale),
+			timeline: tl
+		};
+	});
 var $elm$html$Html$Attributes$type_ = $elm$html$Html$Attributes$stringProperty('type');
 var $elm$html$Html$Attributes$value = $elm$html$Html$Attributes$stringProperty('value');
 var $author$project$Notes$ListNotes$GetNotes = {$: 'GetNotes'};
@@ -7064,6 +7100,51 @@ var $author$project$Notes$Notes$view = function (model) {
 			return $elm$html$Html$text('BAD PAGE');
 	}
 };
+var $elm$core$String$fromFloat = _String_fromNumber;
+var $elm$html$Html$Attributes$title = $elm$html$Html$Attributes$stringProperty('title');
+var $author$project$Timeline$Timeline$viewBar = F2(
+	function (width, _v0) {
+		var timeline = _v0.timeline;
+		var start = _v0.start;
+		var length = _v0.length;
+		var startStyle = function () {
+			if (start.$ === 'Just') {
+				return A2($elm$html$Html$Attributes$style, 'border-left-style', 'solid');
+			} else {
+				return A2($elm$html$Html$Attributes$style, 'border-left-style', 'dashed');
+			}
+		}();
+		var startPoint = A2($elm$core$Maybe$withDefault, 0, start);
+		var endStyle = function () {
+			var _v2 = timeline.period;
+			if (_v2.$ === 'Started') {
+				return A2($elm$html$Html$Attributes$style, 'border-right-style', 'dashed');
+			} else {
+				return A2($elm$html$Html$Attributes$style, 'border-right-style', 'solid');
+			}
+		}();
+		var _v1 = A2($elm$core$Debug$log, 'start', start);
+		return A2(
+			$elm$html$Html$div,
+			_List_fromArray(
+				[
+					A2(
+					$elm$html$Html$Attributes$style,
+					'margin-left',
+					$elm$core$String$fromFloat(startPoint * width) + 'px'),
+					A2(
+					$elm$html$Html$Attributes$style,
+					'width',
+					$elm$core$String$fromFloat(length * width) + 'px'),
+					A2($elm$html$Html$Attributes$style, 'background-color', '#03a9f4'),
+					A2($elm$html$Html$Attributes$style, 'height', '1em'),
+					A2($elm$html$Html$Attributes$style, 'border', '1px solid black'),
+					endStyle,
+					startStyle,
+					$elm$html$Html$Attributes$title(timeline.name)
+				]),
+			_List_Nil);
+	});
 var $author$project$Timeline$Timeline$toString = function (_v0) {
 	var period = _v0.period;
 	var name = _v0.name;
@@ -7164,6 +7245,23 @@ var $author$project$Main$view = function (model) {
 											$elm$core$List$filter,
 											$author$project$Timeline$Timeline$isInViewport(model.viewPort),
 											model.timelines))),
+									A2(
+									$elm$html$Html$div,
+									_List_fromArray(
+										[
+											A2($elm$html$Html$Attributes$style, 'padding', '1em'),
+											A2($elm$html$Html$Attributes$style, 'border', '1px solid grey')
+										]),
+									A2(
+										$elm$core$List$map,
+										$author$project$Timeline$Timeline$viewBar(3),
+										A2(
+											$elm$core$List$map,
+											A2($author$project$Timeline$Timeline$timelineToTimelineBar, model.viewPort, 300),
+											A2(
+												$elm$core$List$filter,
+												$author$project$Timeline$Timeline$isInViewport(model.viewPort),
+												model.timelines)))),
 									A2(
 									$elm$html$Html$div,
 									_List_Nil,

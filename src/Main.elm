@@ -191,6 +191,16 @@ view model =
                                 Timeline.viewTimeline
                                 (List.filter (Timeline.isInViewport model.viewPort) model.timelines)
                             )
+                        , div
+                            [ style "padding" "1em"
+                            , style "border" "1px solid grey"
+                            ]
+                            (List.map
+                                (Timeline.viewBar 3)
+                                (List.filter (Timeline.isInViewport model.viewPort) model.timelines
+                                    |> List.map (Timeline.timelineToTimelineBar model.viewPort 300)
+                                )
+                            )
                         , div [] [ a [ href "https://github.com/crianonim/timelines" ] [ text "Github repo" ] ]
 
                         --, div [] (List.map (\( t, e ) -> Timeline.viewBar t e 500) Timeline.example)

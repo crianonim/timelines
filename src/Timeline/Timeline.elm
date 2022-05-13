@@ -20,6 +20,13 @@ type alias Viewport =
     }
 
 
+type alias TimeLineBar =
+    { start : Maybe Float
+    , length : Float
+    , timeline : Timeline
+    }
+
+
 type alias Timeline =
     { period : Period
     , name : String
@@ -48,36 +55,8 @@ data =
     , Timeline (Started 1952) "Queen Elizabeth II reign"
     , Timeline (Started 2005) "Moved to the UK"
     , Timeline (Closed 1789 1795) "French Revolution"
+    , Timeline (Closed 2014 2018) "Lived in Clapham"
     ]
-
-
-
---
---lowEndViewport : Viewport -> Period -> Year
---lowEndViewport vp p=
---    case p of
---        Point year ->
---            year
---
---        Closed start _ ->
---            start
---
---        Started year ->
---            year
---
---
---
---highEndViewport : Viewport -> Period -> Year
---highEndViewport vp p =
---    case p of
---        Point year ->
---            year
---
---        Closed _ year ->
---            year
---
---        Started _ ->
---            vp.end
 
 
 isInViewport : Viewport -> Timeline -> Bool
@@ -93,72 +72,42 @@ isInViewport { start, end } timeline =
             year <= end
 
 
+timelineToTimelineBar : Viewport -> Float -> Timeline -> TimeLineBar
+timelineToTimelineBar { start, end } width ({ period, name } as tl) =
+    let
+        ( yearStart, yearEnd ) =
+            case period of
+                Point year ->
+                    ( year, year )
 
---
---bothEndsFramed : Viewport -> Period -> ( Year, Year )
---bothEndsFramed frame p =
---    ( lowEndViewport p, highEndViewport frame p )
---
---timeLinesPeriod : List Timeline -> ( Year, Year )
---timeLinesPeriod tls =
---    tls
---        |> List.map .period
---        |> List.foldl
---            (\period ( s1, s2 ) ->
---                let
---                    ( low, high ) =
---                        bothEndsFramed 2021 period
---                in
---                ( min s1 low, max s2 high )
---            )
---            ( 5000, -5000 )
---
---timeLinesViewport : ( Year, Year ) -> ( Year, Year ) -> ( Year, Year )
---timeLinesViewport ( vStart, vEnd ) ( start, end ) =
---    ( min vStart start, max vEnd end )
---
---timeLineExtent : Year -> Year -> Timeline -> ( Float, Float )
---timeLineExtent wholeStart wholeEnd { period } =
---    let
---        duration =
---            end - start
---
---        ( start, end ) =
---            bothEndsFramed 2021 period
---
---        wholeDuration =
---            toFloat
---                (wholeEnd - wholeStart)
---
---        _ =
---            Debug.log "start" [ wholeStart, wholeEnd, start, end ]
---
---        relStart =
---            start - wholeStart
---
---        proportion x =
---            toFloat x / wholeDuration
---    in
---    Tuple.mapBoth proportion proportion ( relStart, duration )
+                Closed y1 y2 ->
+                    ( y1, y2 )
+
+                Started year ->
+                    ( year, end )
+
+        viewPortYears =
+            end - start
+
+        scale =
+            width / toFloat viewPortYears
+    in
+    { start =
+        if start > yearStart then
+            Nothing
+
+        else
+            Just (toFloat (yearStart - start) * scale)
+    , length = toFloat (yearEnd - Basics.max yearStart start) * scale
+    , timeline = tl
+    }
 
 
 exampleVP : Viewport
 exampleVP =
-    { start = 1980
-    , end = 2021
+    { start = 1970
+    , end = 2022
     }
-
-
-
---example =
---    let
---        ( start, end ) =
---            data
---                |> timeLinesPeriod
---                |> timeLinesViewport ( 1900, 2021 )
---    in
---    data
---        |> List.map (\t -> ( t, timeLineExtent start end t ))
 
 
 viewTimeline : Timeline -> Html msg
@@ -166,16 +115,39 @@ viewTimeline tl =
     div [] [ text <| toString tl ]
 
 
+viewBar : Float -> TimeLineBar -> Html msg
+viewBar width { timeline, start, length } =
+    let
+        endStyle =
+            case timeline.period of
+                Started _ ->
+                    style "border-right-style" "dashed"
 
---
---viewBar : Timeline -> ( Float, Float ) -> Float -> Html msg
---viewBar { name } ( start, length ) width =
---    div
---        [ style "margin-left" (String.fromFloat (start * width) ++ "px")
---        , style "width" (String.fromFloat (length * width) ++ "px")
---        , style "background-color" "blue"
---        , style "height" "1em"
---        , style "border" "1px solid black"
---        , title name
---        ]
---        []
+                _ ->
+                    style "border-right-style" "solid"
+
+        startStyle =
+            case start of
+                Just _ ->
+                    style "border-left-style" "solid"
+
+                Nothing ->
+                    style "border-left-style" "dashed"
+
+        startPoint =
+            Maybe.withDefault 0 start
+
+        _ =
+            Debug.log "start" start
+    in
+    div
+        [ style "margin-left" (String.fromFloat (startPoint * width) ++ "px")
+        , style "width" (String.fromFloat (length * width) ++ "px")
+        , style "background-color" "#03a9f4"
+        , style "height" "1em"
+        , style "border" "1px solid black"
+        , endStyle
+        , startStyle
+        , title timeline.name
+        ]
+        []
