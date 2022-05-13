@@ -2,8 +2,9 @@ module Main exposing (main)
 
 import Browser exposing (Document)
 import Browser.Navigation as Nav
-import Html exposing (Attribute, Html, a, div, h1, text)
-import Html.Attributes exposing (href, style)
+import Html exposing (Attribute, Html, a, div, h1, input, text)
+import Html.Attributes exposing (href, style, type_, value)
+import Html.Events exposing (onInput)
 import Notes.Notes as Notes
 import Platform.Cmd exposing (Cmd)
 import Timeline.Timeline as Timeline exposing (Timeline)
@@ -38,6 +39,7 @@ type alias Model =
     { page : Page
     , navKey : Nav.Key
     , timelines : List Timeline
+    , viewPort : Timeline.Viewport
     }
 
 
@@ -45,6 +47,8 @@ type Msg
     = NotesMsg Notes.Msg
     | UrlRequest Browser.UrlRequest
     | ChangedUrl Url
+    | UpdateStart String
+    | UpdateEnd String
 
 
 init : () -> Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -53,7 +57,7 @@ init _ url navKey =
         route =
             Parser.parse urlParser url
     in
-    routeToPage { page = TitlePage, navKey = navKey, timelines = Timeline.data } route
+    routeToPage { page = TitlePage, navKey = navKey, timelines = Timeline.data, viewPort = Timeline.exampleVP } route
 
 
 urlParser : Parser.Parser (Route -> c) c
@@ -107,6 +111,44 @@ update msg model =
         ChangedUrl url ->
             Parser.parse urlParser url |> routeToPage model
 
+        UpdateStart s ->
+            let
+                newValue =
+                    case String.toInt s of
+                        Just i ->
+                            i
+
+                        Nothing ->
+                            if String.length s == 0 then
+                                0
+
+                            else
+                                model.viewPort.start
+
+                vp =
+                    model.viewPort
+            in
+            ( { model | viewPort = { vp | start = newValue } }, Cmd.none )
+
+        UpdateEnd s ->
+            let
+                newValue =
+                    case String.toInt s of
+                        Just i ->
+                            i
+
+                        Nothing ->
+                            if String.length s == 0 then
+                                0
+
+                            else
+                                model.viewPort.end
+
+                vp =
+                    model.viewPort
+            in
+            ( { model | viewPort = { vp | end = newValue } }, Cmd.none )
+
 
 
 -- SUBSCRIPTIONS
@@ -141,8 +183,17 @@ view model =
                                 Timeline.viewTimeline
                                 model.timelines
                             )
+                        , input [ type_ "number", onInput UpdateStart, value <| String.fromInt model.viewPort.start ] []
+                        , input [ type_ "number", onInput UpdateEnd, value <| String.fromInt model.viewPort.end ] []
+                        , text "Visible"
+                        , div []
+                            (List.map
+                                Timeline.viewTimeline
+                                (List.filter (Timeline.isInViewport model.viewPort) model.timelines)
+                            )
                         , div [] [ a [ href "https://github.com/crianonim/timelines" ] [ text "Github repo" ] ]
-                        , div [] (List.map (\( t, e ) -> Timeline.viewBar t e 500) Timeline.example)
+
+                        --, div [] (List.map (\( t, e ) -> Timeline.viewBar t e 500) Timeline.example)
                         ]
 
                 BadPage ->
