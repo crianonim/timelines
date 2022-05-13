@@ -5361,6 +5361,9 @@ var $author$project$Timeline$Timeline$Closed = F2(
 	function (a, b) {
 		return {$: 'Closed', a: a, b: b};
 	});
+var $author$project$Timeline$Timeline$Finished = function (a) {
+	return {$: 'Finished', a: a};
+};
 var $author$project$Timeline$Timeline$Point = function (a) {
 	return {$: 'Point', a: a};
 };
@@ -5400,7 +5403,11 @@ var $author$project$Timeline$Timeline$data = _List_fromArray(
 		A2(
 		$author$project$Timeline$Timeline$Timeline,
 		A2($author$project$Timeline$Timeline$Closed, 2014, 2018),
-		'Lived in Clapham')
+		'Lived in Clapham'),
+		A2(
+		$author$project$Timeline$Timeline$Timeline,
+		$author$project$Timeline$Timeline$Finished(1985),
+		'Finished in 1985')
 	]);
 var $author$project$Timeline$Timeline$exampleVP = {end: 2022, start: 1970};
 var $elm$url$Url$Parser$State = F5(
@@ -6903,9 +6910,12 @@ var $author$project$Timeline$Timeline$isInViewport = F2(
 				var startYear = _v1.a;
 				var endYear = _v1.b;
 				return ((_Utils_cmp(startYear, start) > -1) && (_Utils_cmp(startYear, end) < 1)) || ((_Utils_cmp(endYear, start) > -1) && (_Utils_cmp(endYear, end) < 1));
-			default:
+			case 'Started':
 				var year = _v1.a;
 				return _Utils_cmp(year, end) < 1;
+			default:
+				var year = _v1.a;
+				return _Utils_cmp(year, start) > -1;
 		}
 	});
 var $elm$virtual_dom$VirtualDom$map = _VirtualDom_map;
@@ -6950,6 +6960,13 @@ var $elm$virtual_dom$VirtualDom$style = _VirtualDom_style;
 var $elm$html$Html$Attributes$style = $elm$virtual_dom$VirtualDom$style;
 var $elm$virtual_dom$VirtualDom$text = _VirtualDom_text;
 var $elm$html$Html$text = $elm$virtual_dom$VirtualDom$text;
+var $author$project$Timeline$Timeline$isPeriodFinished = function (period) {
+	if (period.$ === 'Finished') {
+		return true;
+	} else {
+		return false;
+	}
+};
 var $author$project$Timeline$Timeline$timelineToTimelineBar = F3(
 	function (_v0, width, tl) {
 		var start = _v0.start;
@@ -6967,16 +6984,19 @@ var $author$project$Timeline$Timeline$timelineToTimelineBar = F3(
 					var y1 = period.a;
 					var y2 = period.b;
 					return _Utils_Tuple2(y1, y2);
-				default:
+				case 'Started':
 					var year = period.a;
 					return _Utils_Tuple2(year, end);
+				default:
+					var year = period.a;
+					return _Utils_Tuple2(start, year);
 			}
 		}();
 		var yearStart = _v1.a;
 		var yearEnd = _v1.b;
 		return {
 			length: (yearEnd - A2($elm$core$Basics$max, yearStart, start)) * scale,
-			start: (_Utils_cmp(start, yearStart) > 0) ? $elm$core$Maybe$Nothing : $elm$core$Maybe$Just((yearStart - start) * scale),
+			start: ((_Utils_cmp(start, yearStart) > 0) || $author$project$Timeline$Timeline$isPeriodFinished(period)) ? $elm$core$Maybe$Nothing : $elm$core$Maybe$Just((yearStart - start) * scale),
 			timeline: tl
 		};
 	});
@@ -7159,9 +7179,12 @@ var $author$project$Timeline$Timeline$toString = function (_v0) {
 					var from = period.a;
 					var to = period.b;
 					return $elm$core$String$fromInt(from) + (' - ' + $elm$core$String$fromInt(to));
-				default:
+				case 'Started':
 					var startYear = period.a;
 					return $elm$core$String$fromInt(startYear) + ' - ';
+				default:
+					var endYear = period.a;
+					return ' - ' + $elm$core$String$fromInt(endYear);
 			}
 		}());
 };

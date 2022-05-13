@@ -12,6 +12,7 @@ type Period
     = Point Year
     | Closed Year Year
     | Started Year
+    | Finished Year
 
 
 type alias Viewport =
@@ -45,6 +46,9 @@ toString { period, name } =
 
                 Started startYear ->
                     String.fromInt startYear ++ " - "
+
+                Finished endYear ->
+                    " - " ++ String.fromInt endYear
            )
 
 
@@ -56,6 +60,7 @@ data =
     , Timeline (Started 2005) "Moved to the UK"
     , Timeline (Closed 1789 1795) "French Revolution"
     , Timeline (Closed 2014 2018) "Lived in Clapham"
+    , Timeline (Finished 1985) "Finished in 1985"
     ]
 
 
@@ -70,6 +75,19 @@ isInViewport { start, end } timeline =
 
         Started year ->
             year <= end
+
+        Finished year ->
+            year >= start
+
+
+isPeriodFinished : Period -> Bool
+isPeriodFinished period =
+    case period of
+        Finished _ ->
+            True
+
+        _ ->
+            False
 
 
 timelineToTimelineBar : Viewport -> Float -> Timeline -> TimeLineBar
@@ -86,6 +104,9 @@ timelineToTimelineBar { start, end } width ({ period, name } as tl) =
                 Started year ->
                     ( year, end )
 
+                Finished year ->
+                    ( start, year )
+
         viewPortYears =
             end - start
 
@@ -93,7 +114,7 @@ timelineToTimelineBar { start, end } width ({ period, name } as tl) =
             width / toFloat viewPortYears
     in
     { start =
-        if start > yearStart then
+        if start > yearStart || isPeriodFinished period then
             Nothing
 
         else
