@@ -1,5 +1,37 @@
 {
+  "name": "Timelines",
+  "version": "1.0.0",
+  "description": "Timelines",
+  "source": [
+    "index.html"
+  ],
+  "scripts": {
+    "build": "parcel build --no-source-maps",
+    "watch": "parcel watch --no-source-maps",
+    "test": "elm-test"
+  },
+  "license": "UNLICENSED",
+  "private": true,
   "dependencies": {
-    "elm-review": "^2.5.0"
+    "elm": "^0.19.1-5"
+  },
+  "devDependencies": {
+    "@parcel/css": "^1.14.0",
+    "@parcel/transformer-elm": "^2.8.3",
+    "autoprefixer": "^10.4.13",
+    "elm-format": "0.8.5",
+    "elm-hot": "^1.1.6",
+    "elm-review": "^2.9.1",
+    "elm-spec-runner": "^2.5.1",
+    "elm-test": "^0.19.1-revision12",
+    "node-elm-compiler": "^5.0.6",
+    "parcel": "^2.8.3",
+    "postcss": "^8.4.21",
+    "process": "^0.11.10",
+    "tailwindcss": "^3.2.7"
+  },
+  "engines": {
+    "node": "18.x",
+    "npm": "9.x"
   }
 }
