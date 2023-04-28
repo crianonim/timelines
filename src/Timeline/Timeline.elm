@@ -1,7 +1,7 @@
 module Timeline.Timeline exposing (..)
 
 import Html exposing (Attribute, Html, a, div, h1, text)
-import Html.Attributes exposing (href, style, title)
+import Html.Attributes as Attrs exposing (href, style, title)
 
 
 type alias Year =
@@ -164,9 +164,7 @@ viewBar width { timeline, start, length } =
     div
         [ style "margin-left" (String.fromFloat (startPoint * width) ++ "px")
         , style "width" (String.fromFloat (length * width) ++ "px")
-        , style "background-color" "#03a9f4"
-        , style "height" "1em"
-        , style "border" "1px solid black"
+        , Attrs.class "bg-sky-500 h-4 border border-black"
         , endStyle
         , startStyle
         , title timeline.name

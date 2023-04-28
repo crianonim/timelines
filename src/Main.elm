@@ -3,7 +3,7 @@ module Main exposing (main)
 import Browser exposing (Document)
 import Browser.Navigation as Nav
 import Html exposing (Attribute, Html, a, div, h1, input, text)
-import Html.Attributes exposing (href, style, type_, value)
+import Html.Attributes as Attrs exposing (href, style, type_, value)
 import Html.Events exposing (onInput)
 import Notes.Notes as Notes
 import Platform.Cmd exposing (Cmd)
@@ -192,8 +192,7 @@ view model =
                                 (List.filter (Timeline.isInViewport model.viewPort) model.timelines)
                             )
                         , div
-                            [ style "padding" "1em"
-                            , style "border" "1px solid grey"
+                            [ Attrs.class "border border-slate-500"
                             ]
                             (List.map
                                 (Timeline.viewBar 3)
