@@ -1,5 +1,5 @@
 {
-  "name": "Timelines",
+  "name": "timelines",
   "version": "1.0.0",
   "description": "Timelines",
   "source": [
@@ -8,12 +8,14 @@
   "scripts": {
     "build": "parcel build --no-source-maps",
     "watch": "parcel watch --no-source-maps",
+    "json-server": "json-server db.json",
     "test": "elm-test"
   },
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
-    "elm": "^0.19.1-5"
+    "elm": "^0.19.1-5",
+    "json-server": "^0.17.3"
   },
   "devDependencies": {
     "@parcel/css": "^1.14.0",
