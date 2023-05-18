@@ -3,7 +3,67 @@ module Timeline.Timeline exposing (..)
 import Date exposing (Date)
 import Html exposing (Attribute, Html, a, div, h1, text)
 import Html.Attributes as Attrs exposing (href, style, title)
+import Html.Events as Events
+import Json.Encode
 import Time
+
+
+type alias Model =
+    { timelines : List Timeline
+    , viewPort : Viewport
+    }
+
+
+type Msg
+    = UpdateStart String
+    | UpdateEnd String
+
+
+init : Model
+init =
+    { timelines = data, viewPort = exampleVP }
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        UpdateStart s ->
+            let
+                newValue =
+                    case String.toInt s of
+                        Just i ->
+                            Year i
+
+                        Nothing ->
+                            if String.length s == 0 then
+                                Year 0
+
+                            else
+                                model.viewPort.start
+
+                vp =
+                    model.viewPort
+            in
+            ( { model | viewPort = { vp | start = newValue } }, Cmd.none )
+
+        UpdateEnd s ->
+            let
+                newValue =
+                    case String.toInt s of
+                        Just i ->
+                            Year i
+
+                        Nothing ->
+                            if String.length s == 0 then
+                                Year 0
+
+                            else
+                                model.viewPort.end
+
+                vp =
+                    model.viewPort
+            in
+            ( { model | viewPort = { vp | end = newValue } }, Cmd.none )
 
 
 type TimePoint
@@ -119,22 +179,26 @@ timePointToString timePoint =
             [ String.fromInt year, monthToNumeral month, String.fromInt day ] |> String.join "-"
 
 
+periodToString : Period -> String
+periodToString period =
+    case period of
+        Point point ->
+            timePointToString point
+
+        Closed from to ->
+            timePointToString from ++ " - " ++ timePointToString to
+
+        Started startPoint ->
+            timePointToString startPoint ++ " - "
+
+        Finished endPoint ->
+            " - " ++ timePointToString endPoint
+
+
 toString : Timeline -> String
 toString { period, name } =
     name
-        ++ (case period of
-                Point point ->
-                    timePointToString point
-
-                Closed from to ->
-                    timePointToString from ++ " - " ++ timePointToString to
-
-                Started startPoint ->
-                    timePointToString startPoint ++ " - "
-
-                Finished endPoint ->
-                    " - " ++ timePointToString endPoint
-           )
+        ++ periodToString period
 
 
 data =
@@ -305,3 +369,51 @@ viewBar { timeline, start, length } =
         , title timeline.name
         ]
         []
+
+
+encodePeriod : Period -> Json.Encode.Value
+encodePeriod period =
+    periodToString period |> Json.Encode.string
+
+
+encodeTimeline : Timeline -> Json.Encode.Value
+encodeTimeline timeline =
+    Json.Encode.object <|
+        [ ( "period", encodePeriod timeline.period )
+        , ( "name", Json.Encode.string timeline.name )
+        ]
+
+
+view : Model -> Html Msg
+view model =
+    div []
+        [ h1 []
+            [ text "Welcome to Timelines"
+            ]
+        , a [ href "notes" ] [ text "Notes" ]
+        , div []
+            (List.map
+                viewTimeline
+                model.timelines
+            )
+        , Html.input [ Attrs.type_ "number", Events.onInput UpdateStart, Attrs.value <| String.fromInt <| Date.year <| timePointToStartDate model.viewPort.start ] []
+        , Html.input [ Attrs.type_ "number", Events.onInput UpdateEnd, Attrs.value <| String.fromInt <| Date.year <| timePointToEndDate model.viewPort.end ] []
+        , text "Visible"
+        , div []
+            (List.map
+                viewTimeline
+                (List.filter (.period >> isInViewport model.viewPort) model.timelines)
+            )
+        , div
+            [ Attrs.class "border border-slate-500 w-[500px] m-2"
+            ]
+            (List.map
+                viewBar
+                (List.filter (.period >> isInViewport model.viewPort) model.timelines
+                    |> List.map (timelineToTimelineBar model.viewPort 500)
+                )
+            )
+        , div [] [ a [ href "https://github.com/crianonim/timelines" ] [ text "Github repo" ] ]
+
+        --, div [] (List.map (\( t, e ) -> Timeline.viewBar t e 500) Timeline.example)
+        ]
