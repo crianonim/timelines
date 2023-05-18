@@ -1,23 +1,27 @@
 module Timeline.Timeline exposing (..)
 
+import Date exposing (Date)
 import Html exposing (Attribute, Html, a, div, h1, text)
 import Html.Attributes as Attrs exposing (href, style, title)
+import Time
 
 
-type alias Year =
-    Int
+type TimePoint
+    = Year Int
+    | YearMonth Int Time.Month
+    | YearMonthDay Int Time.Month Int
 
 
 type Period
-    = Point Year
-    | Closed Year Year
-    | Started Year
-    | Finished Year
+    = Point TimePoint
+    | Closed TimePoint TimePoint
+    | Started TimePoint
+    | Finished TimePoint
 
 
 type alias Viewport =
-    { start : Year
-    , end : Year
+    { start : TimePoint
+    , end : TimePoint
     }
 
 
@@ -34,50 +38,171 @@ type alias Timeline =
     }
 
 
+monthToNumeral : Time.Month -> String
+monthToNumeral month =
+    case month of
+        Time.Jan ->
+            "01"
+
+        Time.Feb ->
+            "02"
+
+        Time.Mar ->
+            "03"
+
+        Time.Apr ->
+            "04"
+
+        Time.May ->
+            "05"
+
+        Time.Jun ->
+            "06"
+
+        Time.Jul ->
+            "07"
+
+        Time.Aug ->
+            "08"
+
+        Time.Sep ->
+            "09"
+
+        Time.Oct ->
+            "10"
+
+        Time.Nov ->
+            "11"
+
+        Time.Dec ->
+            "12"
+
+
+timePointToStartDate : TimePoint -> Date
+timePointToStartDate tp =
+    case tp of
+        Year year ->
+            Date.fromCalendarDate year Time.Jan 1
+
+        YearMonth year month ->
+            Date.fromCalendarDate year month 1
+
+        YearMonthDay year month day ->
+            Date.fromCalendarDate year month day
+
+
+timePointToEndDate : TimePoint -> Date
+timePointToEndDate tp =
+    case tp of
+        Year year ->
+            Date.fromCalendarDate year Time.Dec 31
+
+        YearMonth year month ->
+            Date.fromCalendarDate year month 2
+                |> Date.ceiling Date.Month
+                |> Date.add Date.Days -1
+
+        YearMonthDay year month day ->
+            Date.fromCalendarDate year month day
+
+
+timePointToString : TimePoint -> String
+timePointToString timePoint =
+    case timePoint of
+        Year year ->
+            String.fromInt year
+
+        YearMonth year month ->
+            [ String.fromInt year, monthToNumeral month ] |> String.join "-"
+
+        YearMonthDay year month day ->
+            [ String.fromInt year, monthToNumeral month, String.fromInt day ] |> String.join "-"
+
+
 toString : Timeline -> String
 toString { period, name } =
     name
         ++ (case period of
-                Point year ->
-                    String.fromInt year
+                Point point ->
+                    timePointToString point
 
                 Closed from to ->
-                    String.fromInt from ++ " - " ++ String.fromInt to
+                    timePointToString from ++ " - " ++ timePointToString to
 
-                Started startYear ->
-                    String.fromInt startYear ++ " - "
+                Started startPoint ->
+                    timePointToString startPoint ++ " - "
 
-                Finished endYear ->
-                    " - " ++ String.fromInt endYear
+                Finished endPoint ->
+                    " - " ++ timePointToString endPoint
            )
 
 
 data =
-    [ Timeline (Point 1980) "Jan's Birthday"
-    , Timeline (Closed 1995 1999) "High School"
-    , Timeline (Started 2019) "Working in Permutive"
-    , Timeline (Started 1952) "Queen Elizabeth II reign"
-    , Timeline (Started 2005) "Moved to the UK"
-    , Timeline (Closed 1789 1795) "French Revolution"
-    , Timeline (Closed 2014 2018) "Lived in Clapham"
-    , Timeline (Finished 1985) "Finished in 1985"
+    [ Timeline (Point <| YearMonthDay 1980 Time.Jun 6) "Jan's Birthday"
+    , Timeline (Closed (Year 1995) (Year 1999)) "High School"
+    , Timeline (Started (Year 2019)) "Working in Permutive"
+    , Timeline (Closed (Year 1952) (Year 2022)) "Queen Elizabeth II reign"
+    , Timeline (Started (Year 2005)) "Moved to the UK"
+    , Timeline (Closed (Year 1789) (Year 1795)) "French Revolution"
+    , Timeline (Closed (Year 2014) (Year 2018)) "Lived in Clapham"
+    , Timeline (Finished (Year 1985)) "Finished in 1985"
+    , Timeline (Point <| YearMonthDay 2023 Time.Apr 6) "Left Permutive"
+    , Timeline (Point <| Year 2022) "Bad Year"
+    , Timeline (Point <| YearMonth 2023 Time.Jun) "Pride Month"
     ]
 
 
-isInViewport : Viewport -> Timeline -> Bool
-isInViewport { start, end } timeline =
-    case timeline.period of
-        Point year ->
-            year <= end && year >= start
+isInViewport : Viewport -> Period -> Bool
+isInViewport { start, end } period =
+    let
+        viewportStart =
+            timePointToStartDate start
+                |> Debug.log "VPStart"
 
-        Closed startYear endYear ->
-            startYear >= start && startYear <= end || endYear >= start && endYear <= end
+        viewportEnd =
+            timePointToEndDate end
+    in
+    case period of
+        Point tp ->
+            let
+                periodStart =
+                    timePointToStartDate tp
 
-        Started year ->
-            year <= end
+                periodEnd =
+                    timePointToEndDate tp
+            in
+            (Date.compare periodStart viewportStart == GT || Date.compare periodStart viewportStart == EQ)
+                && (Date.compare periodEnd viewportEnd == LT || Date.compare periodEnd viewportEnd == EQ)
 
-        Finished year ->
-            year >= start
+        Closed startTP endTP ->
+            let
+                periodStart =
+                    timePointToStartDate startTP
+
+                periodEnd =
+                    timePointToEndDate endTP
+            in
+            ((Date.compare periodEnd viewportStart == GT || Date.compare periodEnd viewportStart == EQ)
+                && (Date.compare periodEnd viewportEnd == LT || Date.compare periodEnd viewportEnd == EQ)
+            )
+                || ((Date.compare periodStart viewportStart == GT || Date.compare periodStart viewportStart == EQ)
+                        && (Date.compare periodStart viewportEnd == LT || Date.compare periodStart viewportEnd == EQ)
+                   )
+
+        --startYear >= start && startYear <= end || endYear >= start && endYear <= end
+        Started tp ->
+            let
+                periodStart =
+                    timePointToStartDate tp
+            in
+            Date.compare periodStart viewportEnd == GT || Date.compare periodStart viewportStart == EQ
+
+        Finished tp ->
+            let
+                periodStart =
+                    timePointToStartDate tp
+            in
+            Date.compare periodStart viewportStart == GT || Date.compare periodStart viewportStart == EQ
 
 
 isPeriodFinished : Period -> Bool
@@ -93,41 +218,51 @@ isPeriodFinished period =
 timelineToTimelineBar : Viewport -> Float -> Timeline -> TimeLineBar
 timelineToTimelineBar { start, end } width ({ period, name } as tl) =
     let
-        ( yearStart, yearEnd ) =
+        viewportStart =
+            timePointToStartDate start
+
+        viewportEnd =
+            timePointToEndDate end
+
+        ( dateStart, dateEnd ) =
             case period of
-                Point year ->
-                    ( year, year )
+                Point tp ->
+                    ( timePointToStartDate tp, timePointToEndDate tp )
 
                 Closed y1 y2 ->
-                    ( y1, y2 )
+                    ( timePointToStartDate y1, timePointToEndDate y2 )
 
-                Started year ->
-                    ( year, end )
+                Started tp ->
+                    ( timePointToStartDate tp, viewportEnd )
 
-                Finished year ->
-                    ( start, year )
+                Finished tp ->
+                    ( viewportStart, timePointToEndDate tp )
 
-        viewPortYears =
-            end - start
+        viewPortDays =
+            Date.diff Date.Days viewportStart viewportEnd
+                |> Debug.log "Days"
 
         scale =
-            width / toFloat viewPortYears
+            width
+                / toFloat viewPortDays
+                |> Debug.log "Scale"
     in
     { start =
-        if start > yearStart || isPeriodFinished period then
+        if Date.compare viewportStart dateStart == GT || isPeriodFinished period then
             Nothing
 
         else
-            Just (toFloat (yearStart - start) * scale)
-    , length = toFloat (yearEnd - Basics.max yearStart start) * scale
+            Just (toFloat (Date.diff Date.Days viewportStart dateStart) * scale)
+    , length = toFloat (Date.diff Date.Days (Date.max viewportStart dateStart) dateEnd) * scale
     , timeline = tl
     }
+        |> Debug.log "TimeLineBar"
 
 
 exampleVP : Viewport
 exampleVP =
-    { start = 1970
-    , end = 2022
+    { start = Year 2020
+    , end = Year 2023
     }
 
 

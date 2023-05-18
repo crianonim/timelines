@@ -112,42 +112,44 @@ update msg model =
             Parser.parse urlParser url |> routeToPage model
 
         UpdateStart s ->
-            let
-                newValue =
-                    case String.toInt s of
-                        Just i ->
-                            i
-
-                        Nothing ->
-                            if String.length s == 0 then
-                                0
-
-                            else
-                                model.viewPort.start
-
-                vp =
-                    model.viewPort
-            in
-            ( { model | viewPort = { vp | start = newValue } }, Cmd.none )
+            --let
+            --    newValue =
+            --        case String.toInt s of
+            --            Just i ->
+            --                i
+            --
+            --            Nothing ->
+            --                if String.length s == 0 then
+            --                    0
+            --
+            --                else
+            --                    model.viewPort.start
+            --
+            --    vp =
+            --        model.viewPort
+            --in
+            --( { model | viewPort = { vp | start = newValue } }, Cmd.none )
+            ( model, Cmd.none )
 
         UpdateEnd s ->
-            let
-                newValue =
-                    case String.toInt s of
-                        Just i ->
-                            i
-
-                        Nothing ->
-                            if String.length s == 0 then
-                                0
-
-                            else
-                                model.viewPort.end
-
-                vp =
-                    model.viewPort
-            in
-            ( { model | viewPort = { vp | end = newValue } }, Cmd.none )
+            --let
+            --    newValue =
+            --        case String.toInt s of
+            --            Just i ->
+            --                i
+            --
+            --            Nothing ->
+            --                if String.length s == 0 then
+            --                    0
+            --
+            --                else
+            --                    model.viewPort.end
+            --
+            --    vp =
+            --        model.viewPort
+            --in
+            --( { model | viewPort = { vp | end = newValue } }, Cmd.none )
+            ( model, Cmd.none )
 
 
 
@@ -183,21 +185,22 @@ view model =
                                 Timeline.viewTimeline
                                 model.timelines
                             )
-                        , input [ type_ "number", onInput UpdateStart, value <| String.fromInt model.viewPort.start ] []
-                        , input [ type_ "number", onInput UpdateEnd, value <| String.fromInt model.viewPort.end ] []
+
+                        --, input [ type_ "number", onInput UpdateStart, value <| String.fromInt model.viewPort.start ] []
+                        --, input [ type_ "number", onInput UpdateEnd, value <| String.fromInt model.viewPort.end ] []
                         , text "Visible"
                         , div []
                             (List.map
                                 Timeline.viewTimeline
-                                (List.filter (Timeline.isInViewport model.viewPort) model.timelines)
+                                (List.filter (.period >> Timeline.isInViewport model.viewPort) model.timelines)
                             )
                         , div
                             [ Attrs.class "border border-slate-500"
                             ]
                             (List.map
                                 (Timeline.viewBar 3)
-                                (List.filter (Timeline.isInViewport model.viewPort) model.timelines
-                                    |> List.map (Timeline.timelineToTimelineBar model.viewPort 300)
+                                (List.filter (.period >> Timeline.isInViewport model.viewPort) model.timelines
+                                    |> List.map (Timeline.timelineToTimelineBar model.viewPort 200)
                                 )
                             )
                         , div [] [ a [ href "https://github.com/crianonim/timelines" ] [ text "Github repo" ] ]
