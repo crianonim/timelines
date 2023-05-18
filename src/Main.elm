@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Browser exposing (Document)
 import Browser.Navigation as Nav
+import Date
 import Html exposing (Attribute, Html, a, div, h1, input, text)
 import Html.Attributes as Attrs exposing (href, style, type_, value)
 import Html.Events exposing (onInput)
@@ -112,44 +113,42 @@ update msg model =
             Parser.parse urlParser url |> routeToPage model
 
         UpdateStart s ->
-            --let
-            --    newValue =
-            --        case String.toInt s of
-            --            Just i ->
-            --                i
-            --
-            --            Nothing ->
-            --                if String.length s == 0 then
-            --                    0
-            --
-            --                else
-            --                    model.viewPort.start
-            --
-            --    vp =
-            --        model.viewPort
-            --in
-            --( { model | viewPort = { vp | start = newValue } }, Cmd.none )
-            ( model, Cmd.none )
+            let
+                newValue =
+                    case String.toInt s of
+                        Just i ->
+                            Timeline.Year i
+
+                        Nothing ->
+                            if String.length s == 0 then
+                                Timeline.Year 0
+
+                            else
+                                model.viewPort.start
+
+                vp =
+                    model.viewPort
+            in
+            ( { model | viewPort = { vp | start = newValue } }, Cmd.none )
 
         UpdateEnd s ->
-            --let
-            --    newValue =
-            --        case String.toInt s of
-            --            Just i ->
-            --                i
-            --
-            --            Nothing ->
-            --                if String.length s == 0 then
-            --                    0
-            --
-            --                else
-            --                    model.viewPort.end
-            --
-            --    vp =
-            --        model.viewPort
-            --in
-            --( { model | viewPort = { vp | end = newValue } }, Cmd.none )
-            ( model, Cmd.none )
+            let
+                newValue =
+                    case String.toInt s of
+                        Just i ->
+                            Timeline.Year i
+
+                        Nothing ->
+                            if String.length s == 0 then
+                                Timeline.Year 0
+
+                            else
+                                model.viewPort.end
+
+                vp =
+                    model.viewPort
+            in
+            ( { model | viewPort = { vp | end = newValue } }, Cmd.none )
 
 
 
@@ -185,9 +184,8 @@ view model =
                                 Timeline.viewTimeline
                                 model.timelines
                             )
-
-                        --, input [ type_ "number", onInput UpdateStart, value <| String.fromInt model.viewPort.start ] []
-                        --, input [ type_ "number", onInput UpdateEnd, value <| String.fromInt model.viewPort.end ] []
+                        , input [ type_ "number", onInput UpdateStart, value <| String.fromInt <| Date.year <| Timeline.timePointToStartDate model.viewPort.start ] []
+                        , input [ type_ "number", onInput UpdateEnd, value <| String.fromInt <| Date.year <| Timeline.timePointToEndDate model.viewPort.end ] []
                         , text "Visible"
                         , div []
                             (List.map
