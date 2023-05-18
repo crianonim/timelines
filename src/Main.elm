@@ -195,12 +195,12 @@ view model =
                                 (List.filter (.period >> Timeline.isInViewport model.viewPort) model.timelines)
                             )
                         , div
-                            [ Attrs.class "border border-slate-500"
+                            [ Attrs.class "border border-slate-500 w-[500px] m-2"
                             ]
                             (List.map
-                                (Timeline.viewBar 3)
+                                Timeline.viewBar
                                 (List.filter (.period >> Timeline.isInViewport model.viewPort) model.timelines
-                                    |> List.map (Timeline.timelineToTimelineBar model.viewPort 200)
+                                    |> List.map (Timeline.timelineToTimelineBar model.viewPort 500)
                                 )
                             )
                         , div [] [ a [ href "https://github.com/crianonim/timelines" ] [ text "Github repo" ] ]

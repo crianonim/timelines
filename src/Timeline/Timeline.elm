@@ -271,8 +271,8 @@ viewTimeline tl =
     div [] [ text <| toString tl ]
 
 
-viewBar : Float -> TimeLineBar -> Html msg
-viewBar width { timeline, start, length } =
+viewBar : TimeLineBar -> Html msg
+viewBar { timeline, start, length } =
     let
         endStyle =
             case timeline.period of
@@ -297,8 +297,8 @@ viewBar width { timeline, start, length } =
             Debug.log "start" start
     in
     div
-        [ style "margin-left" (String.fromFloat (startPoint * width) ++ "px")
-        , style "width" (String.fromFloat (length * width) ++ "px")
+        [ style "margin-left" (String.fromFloat startPoint ++ "px")
+        , style "width" (String.fromFloat length ++ "px")
         , Attrs.class "bg-sky-500 h-4 border border-black"
         , endStyle
         , startStyle
