@@ -19,13 +19,14 @@ type alias Model =
 type Msg
     = UpdateStart String
     | UpdateEnd String
+    | GotTimelines (Result Http.Error (List Timeline))
     | SaveTimeline Timeline
     | SavedTimeline (Result Http.Error Timeline)
 
 
-init : Model
+init : ( Model, Cmd Msg )
 init =
-    { timelines = data, viewPort = exampleVP }
+    ( { timelines = [], viewPort = exampleVP }, getTimelines GotTimelines )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -78,6 +79,18 @@ update msg model =
                     Debug.log "saved" result
             in
             ( model, Cmd.none )
+
+        GotTimelines result ->
+            let
+                _ =
+                    Debug.log "GOT" result
+            in
+            case result of
+                Ok timelines ->
+                    ( { model | timelines = timelines }, Cmd.none )
+
+                Err _ ->
+                    ( model, Cmd.none )
 
 
 type TimePoint
@@ -344,9 +357,9 @@ exampleVP =
     }
 
 
-viewTimeline : Timeline -> Html Msg
+viewTimeline : Timeline -> Html msg
 viewTimeline tl =
-    div [] [ text <| toString tl, Html.button [ Events.onClick <| SaveTimeline tl ] [ text "Save" ] ]
+    div [] [ text <| toString tl ]
 
 
 viewBar : TimeLineBar -> Html msg
@@ -387,6 +400,16 @@ viewBar { timeline, start, length } =
 
 api =
     "http://localhost:3000"
+
+
+getTimelines : (Result Http.Error (List Timeline) -> msg) -> Cmd msg
+getTimelines wrapMsg =
+    Http.get
+        { url = api ++ "/timelines"
+        , expect =
+            Http.expectJson wrapMsg <|
+                Json.Decode.list (Json.Decode.field "timeline" decodeTimeline)
+        }
 
 
 saveTimeline : Timeline -> (Result Http.Error Timeline -> msg) -> Cmd msg
@@ -440,6 +463,22 @@ decodePeriod =
                 [ point ] ->
                     stringToTimePoint point
                         |> Maybe.map (Point >> Json.Decode.succeed)
+                        |> Maybe.withDefault (Json.Decode.fail "")
+
+                [ start, "" ] ->
+                    stringToTimePoint start
+                        |> Maybe.map (Started >> Json.Decode.succeed)
+                        |> Maybe.withDefault (Json.Decode.fail "")
+
+                [ "", end ] ->
+                    stringToTimePoint end
+                        |> Maybe.map (Finished >> Json.Decode.succeed)
+                        |> Maybe.withDefault (Json.Decode.fail "")
+
+                [ start, end ] ->
+                    Maybe.map2 (\s e -> Closed s e |> Json.Decode.succeed)
+                        (stringToTimePoint start)
+                        (stringToTimePoint end)
                         |> Maybe.withDefault (Json.Decode.fail "")
 
                 _ ->

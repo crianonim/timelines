@@ -54,8 +54,11 @@ init _ url navKey =
     let
         route =
             Parser.parse urlParser url
+
+        ( tlModel, _ ) =
+            Timeline.init
     in
-    routeToPage { page = TimelinesPage Timeline.init, navKey = navKey } route
+    routeToPage { page = TimelinesPage tlModel, navKey = navKey } route
 
 
 urlParser : Parser.Parser (Route -> c) c
@@ -77,7 +80,11 @@ routeToPage model route =
             ( { model | page = NotesPage mod }, fx |> Cmd.map NotesMsg )
 
         Just TitleRoute ->
-            ( { model | page = TimelinesPage Timeline.init }, Cmd.none )
+            let
+                ( tlModel, effect ) =
+                    Timeline.init
+            in
+            ( { model | page = TimelinesPage tlModel }, effect |> Cmd.map TimelienMsg )
 
         Nothing ->
             ( { model | page = BadPage }, Cmd.none )
