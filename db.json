@@ -1,4 +1,83 @@
 {
+  "timelines": [
+    {
+      "timeline": {
+        "period": "1980-06-6",
+        "name": "Jan's Birthday"
+      },
+      "id": 1
+    },
+    {
+      "timeline": {
+        "period": "1995 - 1999",
+        "name": "High School"
+      },
+      "id": 2
+    },
+    {
+      "timeline": {
+        "period": "2019 - ",
+        "name": "Working in Permutive"
+      },
+      "id": 3
+    },
+    {
+      "timeline": {
+        "period": "1952 - 2022",
+        "name": "Queen Elizabeth II reign"
+      },
+      "id": 4
+    },
+    {
+      "timeline": {
+        "period": "2005 - ",
+        "name": "Moved to the UK"
+      },
+      "id": 5
+    },
+    {
+      "timeline": {
+        "period": "1789 - 1795",
+        "name": "French Revolution"
+      },
+      "id": 6
+    },
+    {
+      "timeline": {
+        "period": "2014 - 2018",
+        "name": "Lived in Clapham"
+      },
+      "id": 7
+    },
+    {
+      "timeline": {
+        "period": " - 1985",
+        "name": "Finished in 1985"
+      },
+      "id": 8
+    },
+    {
+      "timeline": {
+        "period": "2023-04-6",
+        "name": "Left Permutive"
+      },
+      "id": 9
+    },
+    {
+      "timeline": {
+        "period": "2022",
+        "name": "Bad Year"
+      },
+      "id": 10
+    },
+    {
+      "timeline": {
+        "period": "2023-06",
+        "name": "Pride Month"
+      },
+      "id": 11
+    }
+  ],
   "notes": [
     {
       "id": 1,

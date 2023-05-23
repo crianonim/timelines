@@ -4,6 +4,8 @@ import Date exposing (Date)
 import Html exposing (Attribute, Html, a, div, h1, text)
 import Html.Attributes as Attrs exposing (href, style, title)
 import Html.Events as Events
+import Http
+import Json.Decode
 import Json.Encode
 import Time
 
@@ -17,6 +19,8 @@ type alias Model =
 type Msg
     = UpdateStart String
     | UpdateEnd String
+    | SaveTimeline Timeline
+    | SavedTimeline (Result Http.Error Timeline)
 
 
 init : Model
@@ -64,6 +68,16 @@ update msg model =
                     model.viewPort
             in
             ( { model | viewPort = { vp | end = newValue } }, Cmd.none )
+
+        SaveTimeline timeline ->
+            ( model, saveTimeline timeline SavedTimeline )
+
+        SavedTimeline result ->
+            let
+                _ =
+                    Debug.log "saved" result
+            in
+            ( model, Cmd.none )
 
 
 type TimePoint
@@ -330,9 +344,9 @@ exampleVP =
     }
 
 
-viewTimeline : Timeline -> Html msg
+viewTimeline : Timeline -> Html Msg
 viewTimeline tl =
-    div [] [ text <| toString tl ]
+    div [] [ text <| toString tl, Html.button [ Events.onClick <| SaveTimeline tl ] [ text "Save" ] ]
 
 
 viewBar : TimeLineBar -> Html msg
@@ -371,6 +385,19 @@ viewBar { timeline, start, length } =
         []
 
 
+api =
+    "http://localhost:3000"
+
+
+saveTimeline : Timeline -> (Result Http.Error Timeline -> msg) -> Cmd msg
+saveTimeline timeline wrapMsg =
+    Http.post
+        { url = api ++ "/timelines"
+        , body = Http.jsonBody <| Json.Encode.object [ ( "timeline", encodeTimeline timeline ) ]
+        , expect = Http.expectJson wrapMsg decodeTimeline
+        }
+
+
 encodePeriod : Period -> Json.Encode.Value
 encodePeriod period =
     periodToString period |> Json.Encode.string
@@ -382,6 +409,50 @@ encodeTimeline timeline =
         [ ( "period", encodePeriod timeline.period )
         , ( "name", Json.Encode.string timeline.name )
         ]
+
+
+stringToTimePoint : String -> Maybe TimePoint
+stringToTimePoint string =
+    case String.split "-" string of
+        [ yearStr, monthStr, dayStr ] ->
+            Maybe.map3 (\year month day -> YearMonthDay year month day)
+                (String.toInt yearStr)
+                (String.toInt monthStr |> Maybe.map Date.numberToMonth)
+                (String.toInt dayStr)
+
+        [ yearStr, monthStr ] ->
+            Maybe.map2 (\year month -> YearMonth year month)
+                (String.toInt yearStr)
+                (String.toInt monthStr |> Maybe.map Date.numberToMonth)
+
+        [ yearStr ] ->
+            Maybe.map Year (String.toInt yearStr)
+
+        _ ->
+            Nothing
+
+
+decodePeriod : Json.Decode.Decoder Period
+decodePeriod =
+    let
+        get id =
+            case String.split " - " id of
+                [ point ] ->
+                    stringToTimePoint point
+                        |> Maybe.map (Point >> Json.Decode.succeed)
+                        |> Maybe.withDefault (Json.Decode.fail "")
+
+                _ ->
+                    Json.Decode.fail ("unknown value for Period: " ++ id)
+    in
+    Json.Decode.string |> Json.Decode.andThen get
+
+
+decodeTimeline : Json.Decode.Decoder Timeline
+decodeTimeline =
+    Json.Decode.map2 Timeline
+        (Json.Decode.field "period" decodePeriod)
+        (Json.Decode.field "name" Json.Decode.string)
 
 
 view : Model -> Html Msg
