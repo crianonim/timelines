@@ -1,7 +1,7 @@
 module Timeline.Timeline exposing (..)
 
 import Date exposing (Date)
-import Html exposing (Attribute, Html, a, div, h1, text)
+import Html exposing (Attribute, Html, a, div, h1, h2, text)
 import Html.Attributes as Attrs exposing (href, style, title)
 import Html.Events as Events
 import Http
@@ -17,8 +17,8 @@ type alias Model =
 
 
 type Msg
-    = UpdateStart String
-    | UpdateEnd String
+    = UpdateStart TimePoint
+    | UpdateEnd TimePoint
     | GotTimelines (Result Http.Error (List Timeline))
     | SaveTimeline Timeline
     | SavedTimeline (Result Http.Error Timeline)
@@ -34,41 +34,17 @@ update msg model =
     case msg of
         UpdateStart s ->
             let
-                newValue =
-                    case String.toInt s of
-                        Just i ->
-                            Year i
-
-                        Nothing ->
-                            if String.length s == 0 then
-                                Year 0
-
-                            else
-                                model.viewPort.start
-
                 vp =
                     model.viewPort
             in
-            ( { model | viewPort = { vp | start = newValue } }, Cmd.none )
+            ( { model | viewPort = { vp | start = s } }, Cmd.none )
 
         UpdateEnd s ->
             let
-                newValue =
-                    case String.toInt s of
-                        Just i ->
-                            Year i
-
-                        Nothing ->
-                            if String.length s == 0 then
-                                Year 0
-
-                            else
-                                model.viewPort.end
-
                 vp =
                     model.viewPort
             in
-            ( { model | viewPort = { vp | end = newValue } }, Cmd.none )
+            ( { model | viewPort = { vp | end = s } }, Cmd.none )
 
         SaveTimeline timeline ->
             ( model, saveTimeline timeline SavedTimeline )
@@ -125,44 +101,22 @@ type alias Timeline =
     }
 
 
+timepointToYear : TimePoint -> Int
+timepointToYear tp =
+    case tp of
+        Year int ->
+            int
+
+        YearMonth int _ ->
+            int
+
+        YearMonthDay int _ _ ->
+            int
+
+
 monthToNumeral : Time.Month -> String
-monthToNumeral month =
-    case month of
-        Time.Jan ->
-            "01"
-
-        Time.Feb ->
-            "02"
-
-        Time.Mar ->
-            "03"
-
-        Time.Apr ->
-            "04"
-
-        Time.May ->
-            "05"
-
-        Time.Jun ->
-            "06"
-
-        Time.Jul ->
-            "07"
-
-        Time.Aug ->
-            "08"
-
-        Time.Sep ->
-            "09"
-
-        Time.Oct ->
-            "10"
-
-        Time.Nov ->
-            "11"
-
-        Time.Dec ->
-            "12"
+monthToNumeral =
+    Date.monthToNumber >> String.fromInt >> String.padLeft 2 '0'
 
 
 timePointToStartDate : TimePoint -> Date
@@ -225,6 +179,7 @@ periodToString period =
 toString : Timeline -> String
 toString { period, name } =
     name
+        ++ " "
         ++ periodToString period
 
 
@@ -286,7 +241,7 @@ isInViewport { start, end } period =
                 periodStart =
                     timePointToStartDate tp
             in
-            Date.compare periodStart viewportEnd == GT || Date.compare periodStart viewportStart == EQ
+            Date.compare periodStart viewportEnd == LT || Date.compare periodStart viewportStart == EQ
 
         Finished tp ->
             let
@@ -352,7 +307,7 @@ timelineToTimelineBar { start, end } width ({ period, name } as tl) =
 
 exampleVP : Viewport
 exampleVP =
-    { start = Year 2020
+    { start = YearMonth 2020 Time.Mar
     , end = Year 2023
     }
 
@@ -501,21 +456,26 @@ view model =
             [ text "Welcome to Timelines"
             ]
         , a [ href "notes" ] [ text "Notes" ]
+        , h2 [] [ text "> All entries" ]
         , div []
             (List.map
                 viewTimeline
                 model.timelines
             )
-        , Html.input [ Attrs.type_ "number", Events.onInput UpdateStart, Attrs.value <| String.fromInt <| Date.year <| timePointToStartDate model.viewPort.start ] []
-        , Html.input [ Attrs.type_ "number", Events.onInput UpdateEnd, Attrs.value <| String.fromInt <| Date.year <| timePointToEndDate model.viewPort.end ] []
-        , text "Visible"
+        , div [ Attrs.class "flex gap-4" ]
+            [ div [] [ text "From:" ]
+            , viewTimepointSelector { onSelected = UpdateStart, timepoint = model.viewPort.start }
+            , div [] [ text "To:" ]
+            , viewTimepointSelector { onSelected = UpdateEnd, timepoint = model.viewPort.end }
+            ]
+        , h2 [] [ text "> Visible" ]
         , div []
             (List.map
                 viewTimeline
                 (List.filter (.period >> isInViewport model.viewPort) model.timelines)
             )
         , div
-            [ Attrs.class "border border-slate-500 w-[500px] m-2"
+            [ Attrs.class "border border-slate-500 w-[500px] m-2 overflow-clip"
             ]
             (List.map
                 viewBar
@@ -524,6 +484,62 @@ view model =
                 )
             )
         , div [] [ a [ href "https://github.com/crianonim/timelines" ] [ text "Github repo" ] ]
+        ]
 
-        --, div [] (List.map (\( t, e ) -> Timeline.viewBar t e 500) Timeline.example)
+
+allMonths =
+    List.range 1 12 |> List.map Date.numberToMonth
+
+
+type alias TimepointSelectorConfig msg =
+    { timepoint : TimePoint
+    , onSelected : TimePoint -> msg
+    }
+
+
+viewTimepointSelector : TimepointSelectorConfig msg -> Html msg
+viewTimepointSelector config =
+    let
+        emptyValue =
+            "--"
+
+        parseYear str =
+            String.toInt str |> Maybe.withDefault 0
+
+        getMonth : TimePoint -> Maybe String
+        getMonth tp =
+            case tp of
+                Year _ ->
+                    Nothing
+
+                YearMonth _ month ->
+                    Just <| monthToNumeral month
+
+                YearMonthDay _ month _ ->
+                    Just <| monthToNumeral month
+
+        monthListener : String -> TimePoint
+        monthListener month =
+            String.toInt month
+                |> Maybe.map Date.numberToMonth
+                |> Maybe.map (\m -> YearMonth (timepointToYear config.timepoint) m)
+                |> Maybe.withDefault (Year (timepointToYear config.timepoint))
+    in
+    Html.div []
+        [ Html.input
+            [ Attrs.type_ "number"
+            , Attrs.class "w-16"
+            , Events.onInput (parseYear >> Year >> config.onSelected)
+            , Attrs.value <| String.fromInt <| timepointToYear config.timepoint
+            ]
+            []
+        , Html.select
+            [ Attrs.value <| Maybe.withDefault emptyValue <| getMonth config.timepoint
+            , Events.onInput (monthListener >> config.onSelected)
+            ]
+            (Html.option [] [ Html.text emptyValue ]
+                :: (allMonths
+                        |> List.map (\m -> Html.option [] [ Html.text <| monthToNumeral m ])
+                   )
+            )
         ]
