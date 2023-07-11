@@ -2,6 +2,7 @@ module Notes.Note exposing (..)
 
 import Http
 import Json.Decode as Json
+import Json.Encode
 import Result
 
 
@@ -41,3 +42,12 @@ decodeNote =
     Json.map2 Note
         (Json.field "id" Json.int)
         (Json.field "content" Json.string)
+
+createNote : String -> (Result Http.Error Note -> msg)-> Cmd msg
+createNote noteContent wrapMsg=
+     Http.post
+            { url = api ++ "/notes"
+            , body = Http.jsonBody <| Json.Encode.object [("content", Json.Encode.string noteContent)]
+            , expect = Http.expectJson wrapMsg decodeNote
+            }
+

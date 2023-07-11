@@ -1,23 +1,90 @@
 module Timeline.Timeline exposing (..)
 
-import Html exposing (Attribute, Html, a, div, h1, text)
+import Date exposing (Date)
+import Html exposing (Attribute, Html, a, div, h1, h2, text)
 import Html.Attributes as Attrs exposing (href, style, title)
+import Html.Events as Events
+import Http
+import Json.Decode
+import Json.Encode
+import Time
 
 
-type alias Year =
-    Int
+type alias Model =
+    { timelines : List Timeline
+    , viewPort : Viewport
+    }
+
+
+type Msg
+    = UpdateStart TimePoint
+    | UpdateEnd TimePoint
+    | GotTimelines (Result Http.Error (List Timeline))
+    | SaveTimeline Timeline
+    | SavedTimeline (Result Http.Error Timeline)
+
+
+init : ( Model, Cmd Msg )
+init =
+    ( { timelines = [], viewPort = exampleVP }, getTimelines GotTimelines )
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        UpdateStart s ->
+            let
+                vp =
+                    model.viewPort
+            in
+            ( { model | viewPort = { vp | start = s } }, Cmd.none )
+
+        UpdateEnd s ->
+            let
+                vp =
+                    model.viewPort
+            in
+            ( { model | viewPort = { vp | end = s } }, Cmd.none )
+
+        SaveTimeline timeline ->
+            ( model, saveTimeline timeline SavedTimeline )
+
+        SavedTimeline result ->
+            let
+                _ =
+                    Debug.log "saved" result
+            in
+            ( model, Cmd.none )
+
+        GotTimelines result ->
+            let
+                _ =
+                    Debug.log "GOT" result
+            in
+            case result of
+                Ok timelines ->
+                    ( { model | timelines = timelines }, Cmd.none )
+
+                Err _ ->
+                    ( model, Cmd.none )
+
+
+type TimePoint
+    = Year Int
+    | YearMonth Int Time.Month
+    | YearMonthDay Int Time.Month Int
 
 
 type Period
-    = Point Year
-    | Closed Year Year
-    | Started Year
-    | Finished Year
+    = Point TimePoint
+    | Closed TimePoint TimePoint
+    | Started TimePoint
+    | Finished TimePoint
 
 
 type alias Viewport =
-    { start : Year
-    , end : Year
+    { start : TimePoint
+    , end : TimePoint
     }
 
 
@@ -34,50 +101,154 @@ type alias Timeline =
     }
 
 
+timepointToYear : TimePoint -> Int
+timepointToYear tp =
+    case tp of
+        Year int ->
+            int
+
+        YearMonth int _ ->
+            int
+
+        YearMonthDay int _ _ ->
+            int
+
+
+monthToNumeral : Time.Month -> String
+monthToNumeral =
+    Date.monthToNumber >> String.fromInt >> String.padLeft 2 '0'
+
+
+timePointToStartDate : TimePoint -> Date
+timePointToStartDate tp =
+    case tp of
+        Year year ->
+            Date.fromCalendarDate year Time.Jan 1
+
+        YearMonth year month ->
+            Date.fromCalendarDate year month 1
+
+        YearMonthDay year month day ->
+            Date.fromCalendarDate year month day
+
+
+timePointToEndDate : TimePoint -> Date
+timePointToEndDate tp =
+    case tp of
+        Year year ->
+            Date.fromCalendarDate year Time.Dec 31
+
+        YearMonth year month ->
+            Date.fromCalendarDate year month 2
+                |> Date.ceiling Date.Month
+                |> Date.add Date.Days -1
+
+        YearMonthDay year month day ->
+            Date.fromCalendarDate year month day
+
+
+timePointToString : TimePoint -> String
+timePointToString timePoint =
+    case timePoint of
+        Year year ->
+            String.fromInt year
+
+        YearMonth year month ->
+            [ String.fromInt year, monthToNumeral month ] |> String.join "-"
+
+        YearMonthDay year month day ->
+            [ String.fromInt year, monthToNumeral month, String.fromInt day ] |> String.join "-"
+
+
+periodToString : Period -> String
+periodToString period =
+    case period of
+        Point point ->
+            timePointToString point
+
+        Closed from to ->
+            timePointToString from ++ " - " ++ timePointToString to
+
+        Started startPoint ->
+            timePointToString startPoint ++ " - "
+
+        Finished endPoint ->
+            " - " ++ timePointToString endPoint
+
+
 toString : Timeline -> String
 toString { period, name } =
     name
-        ++ (case period of
-                Point year ->
-                    String.fromInt year
-
-                Closed from to ->
-                    String.fromInt from ++ " - " ++ String.fromInt to
-
-                Started startYear ->
-                    String.fromInt startYear ++ " - "
-
-                Finished endYear ->
-                    " - " ++ String.fromInt endYear
-           )
+        ++ " "
+        ++ periodToString period
 
 
 data =
-    [ Timeline (Point 1980) "Jan's Birthday"
-    , Timeline (Closed 1995 1999) "High School"
-    , Timeline (Started 2019) "Working in Permutive"
-    , Timeline (Started 1952) "Queen Elizabeth II reign"
-    , Timeline (Started 2005) "Moved to the UK"
-    , Timeline (Closed 1789 1795) "French Revolution"
-    , Timeline (Closed 2014 2018) "Lived in Clapham"
-    , Timeline (Finished 1985) "Finished in 1985"
+    [ Timeline (Point <| YearMonthDay 1980 Time.Jun 6) "Jan's Birthday"
+    , Timeline (Closed (Year 1995) (Year 1999)) "High School"
+    , Timeline (Started (Year 2019)) "Working in Permutive"
+    , Timeline (Closed (Year 1952) (Year 2022)) "Queen Elizabeth II reign"
+    , Timeline (Started (Year 2005)) "Moved to the UK"
+    , Timeline (Closed (Year 1789) (Year 1795)) "French Revolution"
+    , Timeline (Closed (Year 2014) (Year 2018)) "Lived in Clapham"
+    , Timeline (Finished (Year 1985)) "Finished in 1985"
+    , Timeline (Point <| YearMonthDay 2023 Time.Apr 6) "Left Permutive"
+    , Timeline (Point <| Year 2022) "Bad Year"
+    , Timeline (Point <| YearMonth 2023 Time.Jun) "Pride Month"
     ]
 
 
-isInViewport : Viewport -> Timeline -> Bool
-isInViewport { start, end } timeline =
-    case timeline.period of
-        Point year ->
-            year <= end && year >= start
+isInViewport : Viewport -> Period -> Bool
+isInViewport { start, end } period =
+    let
+        viewportStart =
+            timePointToStartDate start
+                |> Debug.log "VPStart"
 
-        Closed startYear endYear ->
-            startYear >= start && startYear <= end || endYear >= start && endYear <= end
+        viewportEnd =
+            timePointToEndDate end
+    in
+    case period of
+        Point tp ->
+            let
+                periodStart =
+                    timePointToStartDate tp
 
-        Started year ->
-            year <= end
+                periodEnd =
+                    timePointToEndDate tp
+            in
+            (Date.compare periodStart viewportStart == GT || Date.compare periodStart viewportStart == EQ)
+                && (Date.compare periodEnd viewportEnd == LT || Date.compare periodEnd viewportEnd == EQ)
 
-        Finished year ->
-            year >= start
+        Closed startTP endTP ->
+            let
+                periodStart =
+                    timePointToStartDate startTP
+
+                periodEnd =
+                    timePointToEndDate endTP
+            in
+            ((Date.compare periodEnd viewportStart == GT || Date.compare periodEnd viewportStart == EQ)
+                && (Date.compare periodEnd viewportEnd == LT || Date.compare periodEnd viewportEnd == EQ)
+            )
+                || ((Date.compare periodStart viewportStart == GT || Date.compare periodStart viewportStart == EQ)
+                        && (Date.compare periodStart viewportEnd == LT || Date.compare periodStart viewportEnd == EQ)
+                   )
+
+        --startYear >= start && startYear <= end || endYear >= start && endYear <= end
+        Started tp ->
+            let
+                periodStart =
+                    timePointToStartDate tp
+            in
+            Date.compare periodStart viewportEnd == LT || Date.compare periodStart viewportStart == EQ
+
+        Finished tp ->
+            let
+                periodStart =
+                    timePointToStartDate tp
+            in
+            Date.compare periodStart viewportStart == GT || Date.compare periodStart viewportStart == EQ
 
 
 isPeriodFinished : Period -> Bool
@@ -93,41 +264,51 @@ isPeriodFinished period =
 timelineToTimelineBar : Viewport -> Float -> Timeline -> TimeLineBar
 timelineToTimelineBar { start, end } width ({ period, name } as tl) =
     let
-        ( yearStart, yearEnd ) =
+        viewportStart =
+            timePointToStartDate start
+
+        viewportEnd =
+            timePointToEndDate end
+
+        ( dateStart, dateEnd ) =
             case period of
-                Point year ->
-                    ( year, year )
+                Point tp ->
+                    ( timePointToStartDate tp, timePointToEndDate tp )
 
                 Closed y1 y2 ->
-                    ( y1, y2 )
+                    ( timePointToStartDate y1, timePointToEndDate y2 )
 
-                Started year ->
-                    ( year, end )
+                Started tp ->
+                    ( timePointToStartDate tp, viewportEnd )
 
-                Finished year ->
-                    ( start, year )
+                Finished tp ->
+                    ( viewportStart, timePointToEndDate tp )
 
-        viewPortYears =
-            end - start
+        viewPortDays =
+            Date.diff Date.Days viewportStart viewportEnd
+                |> Debug.log "Days"
 
         scale =
-            width / toFloat viewPortYears
+            width
+                / toFloat viewPortDays
+                |> Debug.log "Scale"
     in
     { start =
-        if start > yearStart || isPeriodFinished period then
+        if Date.compare viewportStart dateStart == GT || isPeriodFinished period then
             Nothing
 
         else
-            Just (toFloat (yearStart - start) * scale)
-    , length = toFloat (yearEnd - Basics.max yearStart start) * scale
+            Just (toFloat (Date.diff Date.Days viewportStart dateStart) * scale)
+    , length = toFloat (Date.diff Date.Days (Date.max viewportStart dateStart) dateEnd) * scale
     , timeline = tl
     }
+        |> Debug.log "TimeLineBar"
 
 
 exampleVP : Viewport
 exampleVP =
-    { start = 1970
-    , end = 2022
+    { start = YearMonthDay 2020 Time.Mar 13
+    , end = Year 2023
     }
 
 
@@ -136,8 +317,8 @@ viewTimeline tl =
     div [] [ text <| toString tl ]
 
 
-viewBar : Float -> TimeLineBar -> Html msg
-viewBar width { timeline, start, length } =
+viewBar : TimeLineBar -> Html msg
+viewBar { timeline, start, length } =
     let
         endStyle =
             case timeline.period of
@@ -162,11 +343,254 @@ viewBar width { timeline, start, length } =
             Debug.log "start" start
     in
     div
-        [ style "margin-left" (String.fromFloat (startPoint * width) ++ "px")
-        , style "width" (String.fromFloat (length * width) ++ "px")
+        [ style "margin-left" (String.fromFloat startPoint ++ "px")
+        , style "width" (String.fromFloat length ++ "px")
         , Attrs.class "bg-sky-500 h-4 border border-black"
         , endStyle
         , startStyle
         , title timeline.name
         ]
         []
+
+
+api =
+    "http://localhost:3000"
+
+
+getTimelines : (Result Http.Error (List Timeline) -> msg) -> Cmd msg
+getTimelines wrapMsg =
+    Http.get
+        { url = api ++ "/timelines"
+        , expect =
+            Http.expectJson wrapMsg <|
+                Json.Decode.list (Json.Decode.field "timeline" decodeTimeline)
+        }
+
+
+saveTimeline : Timeline -> (Result Http.Error Timeline -> msg) -> Cmd msg
+saveTimeline timeline wrapMsg =
+    Http.post
+        { url = api ++ "/timelines"
+        , body = Http.jsonBody <| Json.Encode.object [ ( "timeline", encodeTimeline timeline ) ]
+        , expect = Http.expectJson wrapMsg decodeTimeline
+        }
+
+
+encodePeriod : Period -> Json.Encode.Value
+encodePeriod period =
+    periodToString period |> Json.Encode.string
+
+
+encodeTimeline : Timeline -> Json.Encode.Value
+encodeTimeline timeline =
+    Json.Encode.object <|
+        [ ( "period", encodePeriod timeline.period )
+        , ( "name", Json.Encode.string timeline.name )
+        ]
+
+
+stringToTimePoint : String -> Maybe TimePoint
+stringToTimePoint string =
+    case String.split "-" string of
+        [ yearStr, monthStr, dayStr ] ->
+            Maybe.map3 (\year month day -> YearMonthDay year month day)
+                (String.toInt yearStr)
+                (String.toInt monthStr |> Maybe.map Date.numberToMonth)
+                (String.toInt dayStr)
+
+        [ yearStr, monthStr ] ->
+            Maybe.map2 (\year month -> YearMonth year month)
+                (String.toInt yearStr)
+                (String.toInt monthStr |> Maybe.map Date.numberToMonth)
+
+        [ yearStr ] ->
+            Maybe.map Year (String.toInt yearStr)
+
+        _ ->
+            Nothing
+
+
+decodePeriod : Json.Decode.Decoder Period
+decodePeriod =
+    let
+        get id =
+            case String.split " - " id of
+                [ point ] ->
+                    stringToTimePoint point
+                        |> Maybe.map (Point >> Json.Decode.succeed)
+                        |> Maybe.withDefault (Json.Decode.fail "")
+
+                [ start, "" ] ->
+                    stringToTimePoint start
+                        |> Maybe.map (Started >> Json.Decode.succeed)
+                        |> Maybe.withDefault (Json.Decode.fail "")
+
+                [ "", end ] ->
+                    stringToTimePoint end
+                        |> Maybe.map (Finished >> Json.Decode.succeed)
+                        |> Maybe.withDefault (Json.Decode.fail "")
+
+                [ start, end ] ->
+                    Maybe.map2 (\s e -> Closed s e |> Json.Decode.succeed)
+                        (stringToTimePoint start)
+                        (stringToTimePoint end)
+                        |> Maybe.withDefault (Json.Decode.fail "")
+
+                _ ->
+                    Json.Decode.fail ("unknown value for Period: " ++ id)
+    in
+    Json.Decode.string |> Json.Decode.andThen get
+
+
+decodeTimeline : Json.Decode.Decoder Timeline
+decodeTimeline =
+    Json.Decode.map2 Timeline
+        (Json.Decode.field "period" decodePeriod)
+        (Json.Decode.field "name" Json.Decode.string)
+
+
+view : Model -> Html Msg
+view model =
+    div []
+        [ h1 []
+            [ text "Welcome to Timelines"
+            ]
+        , a [ href "notes" ] [ text "Notes" ]
+        , h2 [] [ text "> All entries" ]
+        , div []
+            (List.map
+                viewTimeline
+                model.timelines
+            )
+        , div [ Attrs.class "flex gap-4" ]
+            [ div [] [ text "From:" ]
+            , viewTimepointSelector { onSelected = UpdateStart, timepoint = model.viewPort.start }
+            , div [] [ text "To:" ]
+            , viewTimepointSelector { onSelected = UpdateEnd, timepoint = model.viewPort.end }
+            ]
+        , div
+            [ Attrs.class "border border-slate-500 w-[500px] m-2 overflow-clip"
+            ]
+            (List.map
+                viewBar
+                (List.filter (.period >> isInViewport model.viewPort) model.timelines
+                    |> List.map (timelineToTimelineBar model.viewPort 500)
+                )
+            )
+        , h2 [] [ text "> Visible" ]
+        , div []
+            (List.map
+                viewTimeline
+                (List.filter (.period >> isInViewport model.viewPort) model.timelines)
+            )
+        , div [] [ a [ href "https://github.com/crianonim/timelines" ] [ text "Github repo" ] ]
+        ]
+
+
+allMonths =
+    List.range 1 12 |> List.map Date.numberToMonth
+
+
+type alias TimepointSelectorConfig msg =
+    { timepoint : TimePoint
+    , onSelected : TimePoint -> msg
+    }
+
+
+daysInAMonth : Int -> Date.Month -> Int
+daysInAMonth year month =
+    Date.fromCalendarDate year month 2
+        |> Date.ceiling Date.Month
+        |> Date.add Date.Days -1
+        |> Date.day
+
+
+viewTimepointSelector : TimepointSelectorConfig msg -> Html msg
+viewTimepointSelector config =
+    let
+        maxDays =
+            case config.timepoint of
+                Year _ ->
+                    Nothing
+
+                YearMonth int month ->
+                    Just <| daysInAMonth int month
+
+                YearMonthDay year month _ ->
+                    Just <| daysInAMonth year month
+
+        emptyValue =
+            "--"
+
+        parseYear str =
+            String.toInt str |> Maybe.withDefault 0
+
+        getMonth : TimePoint -> Maybe String
+        getMonth tp =
+            case tp of
+                Year _ ->
+                    Nothing
+
+                YearMonth _ month ->
+                    Just <| monthToNumeral month
+
+                YearMonthDay _ month _ ->
+                    Just <| monthToNumeral month
+
+        monthListener : String -> TimePoint
+        monthListener month =
+            String.toInt month
+                |> Maybe.map Date.numberToMonth
+                |> Maybe.map (\m -> YearMonth (timepointToYear config.timepoint) m)
+                |> Maybe.withDefault (Year (timepointToYear config.timepoint))
+
+        dayListener : Int -> Time.Month -> String -> TimePoint
+        dayListener year month dayString =
+            String.toInt dayString
+                |> Maybe.map (\d -> YearMonthDay year month d)
+                |> Maybe.withDefault (YearMonth year month)
+    in
+    Html.div []
+        [ Html.input
+            [ Attrs.type_ "number"
+            , Attrs.class "w-16"
+            , Events.onInput (parseYear >> Year >> config.onSelected)
+            , Attrs.value <| String.fromInt <| timepointToYear config.timepoint
+            ]
+            []
+        , Html.select
+            [ Attrs.value <| Maybe.withDefault emptyValue <| getMonth config.timepoint
+            , Events.onInput (monthListener >> config.onSelected)
+            ]
+            (Html.option [] [ Html.text emptyValue ]
+                :: (allMonths
+                        |> List.map (\m -> Html.option [] [ Html.text <| monthToNumeral m ])
+                   )
+            )
+        , case maxDays of
+            Nothing ->
+                Html.text ""
+
+            Just d ->
+                (case config.timepoint of
+                    YearMonthDay year month currentDay ->
+                        Html.select
+                            [ Attrs.value <| String.fromInt currentDay
+                            , Events.onInput (dayListener year month >> config.onSelected)
+                            ]
+
+                    YearMonth year month ->
+                        Html.select
+                            [ Attrs.value emptyValue
+                            , Events.onInput (dayListener year month >> config.onSelected)
+                            ]
+
+                    _ ->
+                        Html.div []
+                )
+                    (Html.option [] [ Html.text emptyValue ]
+                        :: (List.range 1 d
+                                |> List.map (\m -> Html.option [] [ Html.text <| String.fromInt m ])
+                           )
+                    )
+        ]

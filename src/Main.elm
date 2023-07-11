@@ -2,6 +2,7 @@ module Main exposing (main)
 
 import Browser exposing (Document)
 import Browser.Navigation as Nav
+import Date
 import Html exposing (Attribute, Html, a, div, h1, input, text)
 import Html.Attributes as Attrs exposing (href, style, type_, value)
 import Html.Events exposing (onInput)
@@ -26,7 +27,7 @@ main =
 
 type Page
     = NotesPage Notes.Model
-    | TitlePage
+    | TimelinesPage Timeline.Model
     | BadPage
 
 
@@ -38,17 +39,14 @@ type Route
 type alias Model =
     { page : Page
     , navKey : Nav.Key
-    , timelines : List Timeline
-    , viewPort : Timeline.Viewport
     }
 
 
 type Msg
     = NotesMsg Notes.Msg
+    | TimelienMsg Timeline.Msg
     | UrlRequest Browser.UrlRequest
     | ChangedUrl Url
-    | UpdateStart String
-    | UpdateEnd String
 
 
 init : () -> Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -56,8 +54,11 @@ init _ url navKey =
     let
         route =
             Parser.parse urlParser url
+
+        ( tlModel, _ ) =
+            Timeline.init
     in
-    routeToPage { page = TitlePage, navKey = navKey, timelines = Timeline.data, viewPort = Timeline.exampleVP } route
+    routeToPage { page = TimelinesPage tlModel, navKey = navKey } route
 
 
 urlParser : Parser.Parser (Route -> c) c
@@ -79,7 +80,11 @@ routeToPage model route =
             ( { model | page = NotesPage mod }, fx |> Cmd.map NotesMsg )
 
         Just TitleRoute ->
-            ( { model | page = TitlePage }, Cmd.none )
+            let
+                ( tlModel, effect ) =
+                    Timeline.init
+            in
+            ( { model | page = TimelinesPage tlModel }, effect |> Cmd.map TimelienMsg )
 
         Nothing ->
             ( { model | page = BadPage }, Cmd.none )
@@ -111,43 +116,17 @@ update msg model =
         ChangedUrl url ->
             Parser.parse urlParser url |> routeToPage model
 
-        UpdateStart s ->
-            let
-                newValue =
-                    case String.toInt s of
-                        Just i ->
-                            i
+        TimelienMsg tlMsg ->
+            case model.page of
+                TimelinesPage tlModel ->
+                    let
+                        ( mod, fx ) =
+                            Timeline.update tlMsg tlModel
+                    in
+                    ( { model | page = TimelinesPage mod }, fx |> Cmd.map TimelienMsg )
 
-                        Nothing ->
-                            if String.length s == 0 then
-                                0
-
-                            else
-                                model.viewPort.start
-
-                vp =
-                    model.viewPort
-            in
-            ( { model | viewPort = { vp | start = newValue } }, Cmd.none )
-
-        UpdateEnd s ->
-            let
-                newValue =
-                    case String.toInt s of
-                        Just i ->
-                            i
-
-                        Nothing ->
-                            if String.length s == 0 then
-                                0
-
-                            else
-                                model.viewPort.end
-
-                vp =
-                    model.viewPort
-            in
-            ( { model | viewPort = { vp | end = newValue } }, Cmd.none )
+                _ ->
+                    ( model, Cmd.none )
 
 
 
@@ -172,38 +151,8 @@ view model =
                 NotesPage notesModel ->
                     Notes.view notesModel |> Html.map NotesMsg
 
-                TitlePage ->
-                    div []
-                        [ h1 []
-                            [ text "Welcome to Timelines"
-                            ]
-                        , a [ href "notes" ] [ text "Notes" ]
-                        , div []
-                            (List.map
-                                Timeline.viewTimeline
-                                model.timelines
-                            )
-                        , input [ type_ "number", onInput UpdateStart, value <| String.fromInt model.viewPort.start ] []
-                        , input [ type_ "number", onInput UpdateEnd, value <| String.fromInt model.viewPort.end ] []
-                        , text "Visible"
-                        , div []
-                            (List.map
-                                Timeline.viewTimeline
-                                (List.filter (Timeline.isInViewport model.viewPort) model.timelines)
-                            )
-                        , div
-                            [ Attrs.class "border border-slate-500"
-                            ]
-                            (List.map
-                                (Timeline.viewBar 3)
-                                (List.filter (Timeline.isInViewport model.viewPort) model.timelines
-                                    |> List.map (Timeline.timelineToTimelineBar model.viewPort 300)
-                                )
-                            )
-                        , div [] [ a [ href "https://github.com/crianonim/timelines" ] [ text "Github repo" ] ]
-
-                        --, div [] (List.map (\( t, e ) -> Timeline.viewBar t e 500) Timeline.example)
-                        ]
+                TimelinesPage timelinesModel ->
+                    Timeline.view timelinesModel |> Html.map TimelienMsg
 
                 BadPage ->
                     text "BAD PAGE"
