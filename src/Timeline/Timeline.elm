@@ -510,13 +510,13 @@ viewTimepointSelector config =
     let
         maxDays =
             case config.timepoint of
-                Year int ->
+                Year _ ->
                     Nothing
 
                 YearMonth int month ->
                     Just <| daysInAMonth int month
 
-                YearMonthDay year month d ->
+                YearMonthDay year month _ ->
                     Just <| daysInAMonth year month
 
         emptyValue =
