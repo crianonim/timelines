@@ -307,7 +307,7 @@ timelineToTimelineBar { start, end } width ({ period, name } as tl) =
 
 exampleVP : Viewport
 exampleVP =
-    { start = YearMonth 2020 Time.Mar
+    { start = YearMonthDay 2020 Time.Mar 13
     , end = Year 2023
     }
 
@@ -468,12 +468,6 @@ view model =
             , div [] [ text "To:" ]
             , viewTimepointSelector { onSelected = UpdateEnd, timepoint = model.viewPort.end }
             ]
-        , h2 [] [ text "> Visible" ]
-        , div []
-            (List.map
-                viewTimeline
-                (List.filter (.period >> isInViewport model.viewPort) model.timelines)
-            )
         , div
             [ Attrs.class "border border-slate-500 w-[500px] m-2 overflow-clip"
             ]
@@ -482,6 +476,12 @@ view model =
                 (List.filter (.period >> isInViewport model.viewPort) model.timelines
                     |> List.map (timelineToTimelineBar model.viewPort 500)
                 )
+            )
+        , h2 [] [ text "> Visible" ]
+        , div []
+            (List.map
+                viewTimeline
+                (List.filter (.period >> isInViewport model.viewPort) model.timelines)
             )
         , div [] [ a [ href "https://github.com/crianonim/timelines" ] [ text "Github repo" ] ]
         ]
@@ -497,9 +497,28 @@ type alias TimepointSelectorConfig msg =
     }
 
 
+daysInAMonth : Int -> Date.Month -> Int
+daysInAMonth year month =
+    Date.fromCalendarDate year month 2
+        |> Date.ceiling Date.Month
+        |> Date.add Date.Days -1
+        |> Date.day
+
+
 viewTimepointSelector : TimepointSelectorConfig msg -> Html msg
 viewTimepointSelector config =
     let
+        maxDays =
+            case config.timepoint of
+                Year int ->
+                    Nothing
+
+                YearMonth int month ->
+                    Just <| daysInAMonth int month
+
+                YearMonthDay year month d ->
+                    Just <| daysInAMonth year month
+
         emptyValue =
             "--"
 
@@ -524,6 +543,12 @@ viewTimepointSelector config =
                 |> Maybe.map Date.numberToMonth
                 |> Maybe.map (\m -> YearMonth (timepointToYear config.timepoint) m)
                 |> Maybe.withDefault (Year (timepointToYear config.timepoint))
+
+        dayListener : Int -> Time.Month -> String -> TimePoint
+        dayListener year month dayString =
+            String.toInt dayString
+                |> Maybe.map (\d -> YearMonthDay year month d)
+                |> Maybe.withDefault (YearMonth year month)
     in
     Html.div []
         [ Html.input
@@ -542,4 +567,30 @@ viewTimepointSelector config =
                         |> List.map (\m -> Html.option [] [ Html.text <| monthToNumeral m ])
                    )
             )
+        , case maxDays of
+            Nothing ->
+                Html.text ""
+
+            Just d ->
+                (case config.timepoint of
+                    YearMonthDay year month currentDay ->
+                        Html.select
+                            [ Attrs.value <| String.fromInt currentDay
+                            , Events.onInput (dayListener year month >> config.onSelected)
+                            ]
+
+                    YearMonth year month ->
+                        Html.select
+                            [ Attrs.value emptyValue
+                            , Events.onInput (dayListener year month >> config.onSelected)
+                            ]
+
+                    _ ->
+                        Html.div []
+                )
+                    (Html.option [] [ Html.text emptyValue ]
+                        :: (List.range 1 d
+                                |> List.map (\m -> Html.option [] [ Html.text <| String.fromInt m ])
+                           )
+                    )
         ]
