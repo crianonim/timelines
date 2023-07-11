@@ -37,14 +37,14 @@ update msg model =
                 vp =
                     model.viewPort
             in
-            ( { model | viewPort = { vp | start = s } }, Cmd.none )
+            ( { model | viewPort = { vp | start = timepointMin s vp.end } }, Cmd.none )
 
         UpdateEnd s ->
             let
                 vp =
                     model.viewPort
             in
-            ( { model | viewPort = { vp | end = s } }, Cmd.none )
+            ( { model | viewPort = { vp | end = timepointMax s vp.start } }, Cmd.none )
 
         SaveTimeline timeline ->
             ( model, saveTimeline timeline SavedTimeline )
@@ -99,6 +99,32 @@ type alias Timeline =
     { period : Period
     , name : String
     }
+
+
+timepointMin : TimePoint -> TimePoint -> TimePoint
+timepointMin t1 t2 =
+    case Date.compare (timePointToStartDate t1) (timePointToStartDate t2) of
+        LT ->
+            t1
+
+        EQ ->
+            t1
+
+        GT ->
+            t2
+
+
+timepointMax : TimePoint -> TimePoint -> TimePoint
+timepointMax t1 t2 =
+    case Date.compare (timePointToEndDate t1) (timePointToEndDate t2) of
+        LT ->
+            t2
+
+        EQ ->
+            t2
+
+        GT ->
+            t1
 
 
 timepointToYear : TimePoint -> Int
@@ -228,12 +254,13 @@ isInViewport { start, end } period =
                 periodEnd =
                     timePointToEndDate endTP
             in
-            ((Date.compare periodEnd viewportStart == GT || Date.compare periodEnd viewportStart == EQ)
-                && (Date.compare periodEnd viewportEnd == LT || Date.compare periodEnd viewportEnd == EQ)
-            )
-                || ((Date.compare periodStart viewportStart == GT || Date.compare periodStart viewportStart == EQ)
-                        && (Date.compare periodStart viewportEnd == LT || Date.compare periodStart viewportEnd == EQ)
-                   )
+            --((Date.compare periodEnd viewportStart == GT || Date.compare periodEnd viewportStart == EQ)
+            --    && (Date.compare periodEnd viewportEnd == LT || Date.compare periodEnd viewportEnd == EQ)
+            --)
+            --    || ((Date.compare periodStart viewportStart == GT || Date.compare periodStart viewportStart == EQ)
+            --            && (Date.compare periodStart viewportEnd == LT || Date.compare periodStart viewportEnd == EQ)
+            --       )
+            (Date.compare periodStart viewportEnd == LT || Date.compare periodStart viewportEnd == EQ) && (Date.compare periodEnd viewportStart == GT || Date.compare periodEnd viewportStart == EQ)
 
         --startYear >= start && startYear <= end || endYear >= start && endYear <= end
         Started tp ->
@@ -276,7 +303,7 @@ timelineToTimelineBar { start, end } width ({ period, name } as tl) =
                     ( timePointToStartDate tp, timePointToEndDate tp )
 
                 Closed y1 y2 ->
-                    ( timePointToStartDate y1, timePointToEndDate y2 )
+                    ( timePointToStartDate y1, Date.min (timePointToEndDate y2) viewportEnd )
 
                 Started tp ->
                     ( timePointToStartDate tp, viewportEnd )
@@ -456,12 +483,6 @@ view model =
             [ text "Welcome to Timelines"
             ]
         , a [ href "notes" ] [ text "Notes" ]
-        , h2 [] [ text "> All entries" ]
-        , div []
-            (List.map
-                viewTimeline
-                model.timelines
-            )
         , div [ Attrs.class "flex gap-4" ]
             [ div [] [ text "From:" ]
             , viewTimepointSelector { onSelected = UpdateStart, timepoint = model.viewPort.start }
@@ -469,20 +490,33 @@ view model =
             , viewTimepointSelector { onSelected = UpdateEnd, timepoint = model.viewPort.end }
             ]
         , div
-            [ Attrs.class "border border-slate-500 w-[500px] m-2 overflow-clip"
+            [ Attrs.class "border border-slate-500  m-2"
             ]
             (List.map
-                viewBar
-                (List.filter (.period >> isInViewport model.viewPort) model.timelines
-                    |> List.map (timelineToTimelineBar model.viewPort 500)
+                (\tl ->
+                    let
+                        bar =
+                            timelineToTimelineBar model.viewPort 500 tl
+                    in
+                    Html.div [ Attrs.class "flex gap-4 items-center" ] [ Html.div [ Attrs.class "w-[500px]" ] [ viewBar bar ], Html.div [] [ viewTimeline tl ] ]
                 )
-            )
-        , h2 [] [ text "> Visible" ]
-        , div []
-            (List.map
-                viewTimeline
                 (List.filter (.period >> isInViewport model.viewPort) model.timelines)
             )
+
+        --, h2 [] [ text "> Visible" ]
+        --, div []
+        --    (List.map
+        --        viewTimeline
+        --        (List.filter (.period >> isInViewport model.viewPort) model.timelines)
+        --    )
+        , div [ Attrs.class "border border-slate-500 h-[240px] overflow-scroll" ]
+            [ h2 [] [ text "> All entries" ]
+            , div []
+                (List.map
+                    viewTimeline
+                    model.timelines
+                )
+            ]
         , div [] [ a [ href "https://github.com/crianonim/timelines" ] [ text "Github repo" ] ]
         ]
 
