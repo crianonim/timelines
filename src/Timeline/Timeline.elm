@@ -85,7 +85,7 @@ update msg model =
             , Cmd.none
             )
 
-        SavedTimeline mId (Err err) ->
+        SavedTimeline _ (Err err) ->
             let
                 _ =
                     Debug.log "error saving " err
