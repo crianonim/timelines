@@ -27,6 +27,7 @@ type Msg
     | SaveTimeline Timeline
     | SavedTimeline (Result Http.Error Timeline)
     | RemoveTimeline Int
+    | RemovedTimeline Int (Result Http.Error ())
 
 
 init : ( Model, Cmd Msg )
@@ -83,9 +84,15 @@ update msg model =
             ( { model | newTimelinePeriod = period }, Cmd.none )
 
         RemoveTimeline id ->
+            ( model, removeTimeline id (RemovedTimeline id) )
+
+        RemovedTimeline id (Ok ()) ->
+            ( { model | timelines = List.filter (\tl -> tl.id /= id) model.timelines }, Cmd.none )
+
+        RemovedTimeline id (Err e) ->
             let
                 _ =
-                    Debug.log "remove timeline" id
+                    Debug.log "remove error" ( id, e )
             in
             ( model, Cmd.none )
 
@@ -457,6 +464,19 @@ saveTimeline timeline wrapMsg =
         { url = api ++ "/timelines"
         , body = Http.jsonBody <| Json.Encode.object [ ( "timeline", encodeTimeline timeline ) ]
         , expect = Http.expectJson wrapMsg decodeTimeline
+        }
+
+
+removeTimeline : Int -> (Result Http.Error () -> msg) -> Cmd msg
+removeTimeline id wrapMsg =
+    Http.request
+        { method = "DELETE"
+        , headers = []
+        , url = api ++ "/timelines/" ++ String.fromInt id
+        , body = Http.emptyBody
+        , expect = Http.expectWhatever wrapMsg
+        , timeout = Nothing
+        , tracker = Nothing
         }
 
 
