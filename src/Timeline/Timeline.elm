@@ -23,7 +23,6 @@ type Msg
     | UpdateEnd TimePoint
     | GotTimelines (Result Http.Error (List Timeline))
     | UpdatePeriod Period
-    | UpdateNewTimelinePeriod TimePoint
     | UpdateNewTimelineName String
     | SaveTimeline Timeline
     | SavedTimeline (Result Http.Error Timeline)
@@ -75,9 +74,6 @@ update msg model =
                             Debug.log "Error " e
                     in
                     ( model, Cmd.none )
-
-        UpdateNewTimelinePeriod timePoint ->
-            ( { model | newTimelinePeriod = Point timePoint }, Cmd.none )
 
         UpdateNewTimelineName name ->
             ( { model | newTimelineName = name }, Cmd.none )
