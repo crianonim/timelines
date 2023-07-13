@@ -15,6 +15,7 @@ type alias Model =
     , viewPort : Viewport
     , newTimelinePeriod : Period
     , newTimelineName : String
+    , isEditingId : Maybe Int
     }
 
 
@@ -24,15 +25,16 @@ type Msg
     | GotTimelines (Result Http.Error (List Timeline))
     | UpdatePeriod Period
     | UpdateNewTimelineName String
-    | SaveTimeline Timeline
-    | SavedTimeline (Result Http.Error Timeline)
+    | SaveTimeline (Maybe Int) Period String
+    | SavedTimeline (Maybe Int) (Result Http.Error Timeline)
     | RemoveTimeline Int
     | RemovedTimeline Int (Result Http.Error ())
+    | EditTimeline Int
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { timelines = [], viewPort = exampleVP, newTimelinePeriod = Point <| Year 2023, newTimelineName = "" }, getTimelines GotTimelines )
+    ( { timelines = [], viewPort = exampleVP, newTimelinePeriod = Point <| Year 2023, newTimelineName = "", isEditingId = Nothing }, getTimelines GotTimelines )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -52,13 +54,38 @@ update msg model =
             in
             ( { model | viewPort = { vp | end = timepointMax s vp.start } }, Cmd.none )
 
-        SaveTimeline timeline ->
-            ( model, saveTimeline timeline SavedTimeline )
+        SaveTimeline mId period name ->
+            ( model
+            , case mId of
+                Nothing ->
+                    saveNewTimeline { id = 0, name = name, period = period } (SavedTimeline mId)
 
-        SavedTimeline (Ok tl) ->
-            ( { model | timelines = model.timelines ++ [ tl ] }, Cmd.none )
+                Just id ->
+                    saveEditTimeline { id = id, name = name, period = period } (SavedTimeline mId)
+            )
 
-        SavedTimeline (Err err) ->
+        SavedTimeline mId (Ok tl) ->
+            ( { model
+                | timelines =
+                    case mId of
+                        Just id ->
+                            model.timelines
+                                |> List.map
+                                    (\t ->
+                                        if t.id == id then
+                                            tl
+
+                                        else
+                                            t
+                                    )
+
+                        Nothing ->
+                            model.timelines ++ [ tl ]
+              }
+            , Cmd.none
+            )
+
+        SavedTimeline mId (Err err) ->
             let
                 _ =
                     Debug.log "error saving " err
@@ -95,6 +122,27 @@ update msg model =
                     Debug.log "remove error" ( id, e )
             in
             ( model, Cmd.none )
+
+        EditTimeline id ->
+            let
+                tl : Maybe Timeline
+                tl =
+                    model.timelines
+                        |> List.filter (\t -> t.id == id)
+                        |> List.head
+            in
+            ( case tl of
+                Nothing ->
+                    model
+
+                Just timeline ->
+                    { model
+                        | isEditingId = Just id
+                        , newTimelineName = timeline.name
+                        , newTimelinePeriod = timeline.period
+                    }
+            , Cmd.none
+            )
 
 
 type TimePoint
@@ -408,6 +456,7 @@ viewTimeline tl =
     div []
         [ text <| toString tl
         , Html.button [ Events.onClick <| RemoveTimeline tl.id ] [ Html.text " [x]" ]
+        , Html.button [ Events.onClick <| EditTimeline tl.id ] [ Html.text " [edit]" ]
         ]
 
 
@@ -458,12 +507,25 @@ getTimelines wrapMsg =
         }
 
 
-saveTimeline : Timeline -> (Result Http.Error Timeline -> msg) -> Cmd msg
-saveTimeline timeline wrapMsg =
+saveNewTimeline : Timeline -> (Result Http.Error Timeline -> msg) -> Cmd msg
+saveNewTimeline timeline wrapMsg =
     Http.post
         { url = api ++ "/timelines"
         , body = Http.jsonBody <| Json.Encode.object [ ( "timeline", encodeTimeline timeline ) ]
         , expect = Http.expectJson wrapMsg decodeTimeline
+        }
+
+
+saveEditTimeline : Timeline -> (Result Http.Error Timeline -> msg) -> Cmd msg
+saveEditTimeline timeline wrapMsg =
+    Http.request
+        { method = "PATCH"
+        , headers = []
+        , url = api ++ "/timelines/" ++ String.fromInt timeline.id
+        , body = Http.jsonBody <| Json.Encode.object [ ( "timeline", encodeTimeline timeline ) ]
+        , expect = Http.expectJson wrapMsg decodeTimeline
+        , timeout = Nothing
+        , tracker = Nothing
         }
 
 
@@ -560,7 +622,7 @@ view model =
         [ h1 [ Attrs.class "text-xl mb-4" ]
             [ text "Welcome to Timelines"
             ]
-        , div [] [ viewNewTimeline model.newTimelinePeriod model.newTimelineName ]
+        , div [] [ viewNewTimeline model.newTimelinePeriod model.newTimelineName model.isEditingId ]
         , div [ Attrs.class "flex gap-4" ]
             [ div [] [ text "From:" ]
             , viewTimepointSelector { onSelected = UpdateStart, timepoint = model.viewPort.start }
@@ -712,8 +774,17 @@ viewTimepointSelector config =
         ]
 
 
-viewNewTimeline : Period -> String -> Html Msg
-viewNewTimeline period name =
+viewNewTimeline : Period -> String -> Maybe Int -> Html Msg
+viewNewTimeline period name isEditingId =
+    let
+        ( message, buttonLabel ) =
+            case isEditingId of
+                Just id ->
+                    ( SaveTimeline (Just id) period name, "Save" )
+
+                Nothing ->
+                    ( SaveTimeline Nothing period name, "New" )
+    in
     Html.div [ Attrs.class "flex gap-4" ]
         [ Html.input [ Events.onInput UpdateNewTimelineName, Attrs.value name ] []
         , Html.select
@@ -763,5 +834,5 @@ viewNewTimeline period name =
                 viewTimepointSelector { timepoint = timePoint, onSelected = Finished >> UpdatePeriod }
 
         --, viewTimepointSelector { timepoint = firstTimePointOfPeriod period, onSelected = UpdateNewTimelinePeriod }
-        , Html.button [ Events.onClick <| SaveTimeline { id = 0, name = name, period = period } ] [ Html.text "New" ]
+        , Html.button [ Events.onClick message ] [ Html.text buttonLabel ]
         ]

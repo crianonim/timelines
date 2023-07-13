@@ -100,13 +100,6 @@
     },
     {
       "timeline": {
-        "period": "2023-05-02 - 2023-07-05",
-        "name": "closed test"
-      },
-      "id": 19
-    },
-    {
-      "timeline": {
         "period": "1991-05-06",
         "name": "programming"
       },
@@ -115,7 +108,7 @@
     {
       "timeline": {
         "period": "1991-05-06 - ",
-        "name": "programming"
+        "name": "programming3"
       },
       "id": 21
     },
@@ -125,6 +118,13 @@
         "name": "Using Android"
       },
       "id": 23
+    },
+    {
+      "timeline": {
+        "period": "2023-04 - 2023-09",
+        "name": "test4"
+      },
+      "id": 24
     }
   ],
   "notes": [
