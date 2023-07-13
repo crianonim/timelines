@@ -183,7 +183,7 @@ timePointToString timePoint =
             [ String.fromInt year, monthToNumeral month ] |> String.join "-"
 
         YearMonthDay year month day ->
-            [ String.fromInt year, monthToNumeral month, String.fromInt day ] |> String.join "-"
+            [ String.fromInt year, monthToNumeral month, String.fromInt day |> String.padLeft 2 '0' ] |> String.join "-"
 
 
 periodToString : Period -> String
@@ -196,10 +196,10 @@ periodToString period =
             timePointToString from ++ " - " ++ timePointToString to
 
         Started startPoint ->
-            timePointToString startPoint ++ " - "
+            timePointToString startPoint ++ " - ..."
 
         Finished endPoint ->
-            " - " ++ timePointToString endPoint
+            "... - " ++ timePointToString endPoint
 
 
 toString : Timeline -> String
@@ -479,10 +479,9 @@ decodeTimeline =
 view : Model -> Html Msg
 view model =
     div []
-        [ h1 []
+        [ h1 [ Attrs.class "text-xl mb-4" ]
             [ text "Welcome to Timelines"
             ]
-        , a [ href "notes" ] [ text "Notes" ]
         , div [ Attrs.class "flex gap-4" ]
             [ div [] [ text "From:" ]
             , viewTimepointSelector { onSelected = UpdateStart, timepoint = model.viewPort.start }
@@ -498,7 +497,10 @@ view model =
                         bar =
                             timelineToTimelineBar model.viewPort 500 tl
                     in
-                    Html.div [ Attrs.class "flex gap-4 items-center" ] [ Html.div [ Attrs.class "w-[500px]" ] [ viewBar bar ], Html.div [] [ viewTimeline tl ] ]
+                    Html.div [ Attrs.class "flex gap-4 items-center" ]
+                        [ Html.div [ Attrs.class "w-[500px]" ] [ viewBar bar ]
+                        , Html.div [ Attrs.class "text-sm" ] [ viewTimeline tl ]
+                        ]
                 )
                 (List.filter (.period >> isInViewport model.viewPort) model.timelines)
             )
@@ -517,6 +519,7 @@ view model =
                     model.timelines
                 )
             ]
+        , a [ href "notes" ] [ text "Notes" ]
         , div [] [ a [ href "https://github.com/crianonim/timelines" ] [ text "Github repo" ] ]
         ]
 
