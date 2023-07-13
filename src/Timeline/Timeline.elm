@@ -13,6 +13,8 @@ import Time
 type alias Model =
     { timelines : List Timeline
     , viewPort : Viewport
+    , newTimelinePeriod : Period
+    , newTimelineName : String
     }
 
 
@@ -20,13 +22,16 @@ type Msg
     = UpdateStart TimePoint
     | UpdateEnd TimePoint
     | GotTimelines (Result Http.Error (List Timeline))
+    | UpdatePeriod Period
+    | UpdateNewTimelinePeriod TimePoint
+    | UpdateNewTimelineName String
     | SaveTimeline Timeline
     | SavedTimeline (Result Http.Error Timeline)
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { timelines = [], viewPort = exampleVP }, getTimelines GotTimelines )
+    ( { timelines = [], viewPort = exampleVP, newTimelinePeriod = Point <| Year 2023, newTimelineName = "" }, getTimelines GotTimelines )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -49,24 +54,40 @@ update msg model =
         SaveTimeline timeline ->
             ( model, saveTimeline timeline SavedTimeline )
 
-        SavedTimeline result ->
+        SavedTimeline (Ok tl) ->
+            ( { model | timelines = model.timelines ++ [ tl ] }, Cmd.none )
+
+        SavedTimeline (Err err) ->
             let
                 _ =
-                    Debug.log "saved" result
+                    Debug.log "error saving " err
             in
             ( model, Cmd.none )
 
         GotTimelines result ->
-            let
-                _ =
-                    Debug.log "GOT" result
-            in
             case result of
                 Ok timelines ->
                     ( { model | timelines = timelines }, Cmd.none )
 
-                Err _ ->
+                Err e ->
+                    let
+                        _ =
+                            Debug.log "Error " e
+                    in
                     ( model, Cmd.none )
+
+        UpdateNewTimelinePeriod timePoint ->
+            ( { model | newTimelinePeriod = Point timePoint }, Cmd.none )
+
+        UpdateNewTimelineName name ->
+            ( { model | newTimelineName = name }, Cmd.none )
+
+        UpdatePeriod period ->
+            let
+                _ =
+                    Debug.log "new period" period
+            in
+            ( { model | newTimelinePeriod = period }, Cmd.none )
 
 
 type TimePoint
@@ -80,6 +101,13 @@ type Period
     | Closed TimePoint TimePoint
     | Started TimePoint
     | Finished TimePoint
+
+
+type PeriodType
+    = PointType
+    | ClosedType
+    | StartedType
+    | FinishedType
 
 
 type alias Viewport =
@@ -96,9 +124,42 @@ type alias TimeLineBar =
 
 
 type alias Timeline =
-    { period : Period
+    { id : Int
+    , period : Period
     , name : String
     }
+
+
+periodToPeriodType : Period -> PeriodType
+periodToPeriodType period =
+    case period of
+        Point _ ->
+            PointType
+
+        Closed _ _ ->
+            ClosedType
+
+        Started _ ->
+            StartedType
+
+        Finished _ ->
+            FinishedType
+
+
+firstTimePointOfPeriod : Period -> TimePoint
+firstTimePointOfPeriod period =
+    case period of
+        Point timePoint ->
+            timePoint
+
+        Closed timePoint _ ->
+            timePoint
+
+        Started timePoint ->
+            timePoint
+
+        Finished timePoint ->
+            timePoint
 
 
 timepointMin : TimePoint -> TimePoint -> TimePoint
@@ -196,10 +257,10 @@ periodToString period =
             timePointToString from ++ " - " ++ timePointToString to
 
         Started startPoint ->
-            timePointToString startPoint ++ " - ..."
+            timePointToString startPoint ++ " - "
 
         Finished endPoint ->
-            "... - " ++ timePointToString endPoint
+            " - " ++ timePointToString endPoint
 
 
 toString : Timeline -> String
@@ -210,17 +271,17 @@ toString { period, name } =
 
 
 data =
-    [ Timeline (Point <| YearMonthDay 1980 Time.Jun 6) "Jan's Birthday"
-    , Timeline (Closed (Year 1995) (Year 1999)) "High School"
-    , Timeline (Started (Year 2019)) "Working in Permutive"
-    , Timeline (Closed (Year 1952) (Year 2022)) "Queen Elizabeth II reign"
-    , Timeline (Started (Year 2005)) "Moved to the UK"
-    , Timeline (Closed (Year 1789) (Year 1795)) "French Revolution"
-    , Timeline (Closed (Year 2014) (Year 2018)) "Lived in Clapham"
-    , Timeline (Finished (Year 1985)) "Finished in 1985"
-    , Timeline (Point <| YearMonthDay 2023 Time.Apr 6) "Left Permutive"
-    , Timeline (Point <| Year 2022) "Bad Year"
-    , Timeline (Point <| YearMonth 2023 Time.Jun) "Pride Month"
+    [ Timeline 0 (Point <| YearMonthDay 1980 Time.Jun 6) "Jan's Birthday"
+    , Timeline 1 (Closed (Year 1995) (Year 1999)) "High School"
+    , Timeline 2 (Started (Year 2019)) "Working in Permutive"
+    , Timeline 3 (Closed (Year 1952) (Year 2022)) "Queen Elizabeth II reign"
+    , Timeline 4 (Started (Year 2005)) "Moved to the UK"
+    , Timeline 5 (Closed (Year 1789) (Year 1795)) "French Revolution"
+    , Timeline 6 (Closed (Year 2014) (Year 2018)) "Lived in Clapham"
+    , Timeline 7 (Finished (Year 1985)) "Finished in 1985"
+    , Timeline 8 (Point <| YearMonthDay 2023 Time.Apr 6) "Left Permutive"
+    , Timeline 9 (Point <| Year 2022) "Bad Year"
+    , Timeline 10 (Point <| YearMonth 2023 Time.Jun) "Pride Month"
     ]
 
 
@@ -229,7 +290,6 @@ isInViewport { start, end } period =
     let
         viewportStart =
             timePointToStartDate start
-                |> Debug.log "VPStart"
 
         viewportEnd =
             timePointToEndDate end
@@ -313,12 +373,10 @@ timelineToTimelineBar { start, end } width ({ period, name } as tl) =
 
         viewPortDays =
             Date.diff Date.Days viewportStart viewportEnd
-                |> Debug.log "Days"
 
         scale =
             width
                 / toFloat viewPortDays
-                |> Debug.log "Scale"
     in
     { start =
         if Date.compare viewportStart dateStart == GT || isPeriodFinished period then
@@ -329,7 +387,6 @@ timelineToTimelineBar { start, end } width ({ period, name } as tl) =
     , length = toFloat (Date.diff Date.Days (Date.max viewportStart dateStart) dateEnd) * scale
     , timeline = tl
     }
-        |> Debug.log "TimeLineBar"
 
 
 exampleVP : Viewport
@@ -365,9 +422,6 @@ viewBar { timeline, start, length } =
 
         startPoint =
             Maybe.withDefault 0 start
-
-        _ =
-            Debug.log "start" start
     in
     div
         [ style "margin-left" (String.fromFloat startPoint ++ "px")
@@ -390,7 +444,7 @@ getTimelines wrapMsg =
         { url = api ++ "/timelines"
         , expect =
             Http.expectJson wrapMsg <|
-                Json.Decode.list (Json.Decode.field "timeline" decodeTimeline)
+                Json.Decode.list decodeTimeline
         }
 
 
@@ -471,9 +525,10 @@ decodePeriod =
 
 decodeTimeline : Json.Decode.Decoder Timeline
 decodeTimeline =
-    Json.Decode.map2 Timeline
-        (Json.Decode.field "period" decodePeriod)
-        (Json.Decode.field "name" Json.Decode.string)
+    Json.Decode.map3 Timeline
+        (Json.Decode.field "id" Json.Decode.int)
+        (Json.Decode.at [ "timeline", "period" ] decodePeriod)
+        (Json.Decode.at [ "timeline", "name" ] Json.Decode.string)
 
 
 view : Model -> Html Msg
@@ -482,6 +537,7 @@ view model =
         [ h1 [ Attrs.class "text-xl mb-4" ]
             [ text "Welcome to Timelines"
             ]
+        , div [] [ viewNewTimeline model.newTimelinePeriod model.newTimelineName ]
         , div [ Attrs.class "flex gap-4" ]
             [ div [] [ text "From:" ]
             , viewTimepointSelector { onSelected = UpdateStart, timepoint = model.viewPort.start }
@@ -630,4 +686,59 @@ viewTimepointSelector config =
                                 |> List.map (\m -> Html.option [] [ Html.text <| String.fromInt m ])
                            )
                     )
+        ]
+
+
+viewNewTimeline : Period -> String -> Html Msg
+viewNewTimeline period name =
+    Html.div [ Attrs.class "flex gap-4" ]
+        [ Html.input [ Events.onInput UpdateNewTimelineName, Attrs.value name ] []
+        , Html.select
+            [ Events.onInput
+                (\t ->
+                    UpdatePeriod
+                        (case t of
+                            "Point" ->
+                                Point (firstTimePointOfPeriod period)
+
+                            "Closed" ->
+                                Closed (firstTimePointOfPeriod period) (firstTimePointOfPeriod period)
+
+                            "Started" ->
+                                Started (firstTimePointOfPeriod period)
+
+                            "Finished" ->
+                                Finished (firstTimePointOfPeriod period)
+
+                            _ ->
+                                period
+                        )
+                )
+            ]
+            [ Html.option [ Attrs.selected (periodToPeriodType period == PointType) ] [ Html.text "Point" ]
+            , Html.option
+                [ Attrs.selected (periodToPeriodType period == ClosedType)
+                ]
+                [ Html.text "Closed" ]
+            , Html.option [ Attrs.selected (periodToPeriodType period == StartedType) ] [ Html.text "Started" ]
+            , Html.option [ Attrs.selected (periodToPeriodType period == FinishedType) ] [ Html.text "Finished" ]
+            ]
+        , case period of
+            Point tp ->
+                viewTimepointSelector { timepoint = tp, onSelected = Point >> UpdatePeriod }
+
+            Closed t1 t2 ->
+                Html.div [ Attrs.class "flex gap-4" ]
+                    [ viewTimepointSelector { timepoint = t1, onSelected = \s -> UpdatePeriod (Closed s t2) }
+                    , viewTimepointSelector { timepoint = t2, onSelected = \s -> UpdatePeriod (Closed t1 s) }
+                    ]
+
+            Started timePoint ->
+                viewTimepointSelector { timepoint = timePoint, onSelected = Started >> UpdatePeriod }
+
+            Finished timePoint ->
+                viewTimepointSelector { timepoint = timePoint, onSelected = Finished >> UpdatePeriod }
+
+        --, viewTimepointSelector { timepoint = firstTimePointOfPeriod period, onSelected = UpdateNewTimelinePeriod }
+        , Html.button [ Events.onClick <| SaveTimeline { id = 0, name = name, period = period } ] [ Html.text "New" ]
         ]
