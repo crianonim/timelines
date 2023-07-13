@@ -26,6 +26,7 @@ type Msg
     | UpdateNewTimelineName String
     | SaveTimeline Timeline
     | SavedTimeline (Result Http.Error Timeline)
+    | RemoveTimeline Int
 
 
 init : ( Model, Cmd Msg )
@@ -79,11 +80,14 @@ update msg model =
             ( { model | newTimelineName = name }, Cmd.none )
 
         UpdatePeriod period ->
+            ( { model | newTimelinePeriod = period }, Cmd.none )
+
+        RemoveTimeline id ->
             let
                 _ =
-                    Debug.log "new period" period
+                    Debug.log "remove timeline" id
             in
-            ( { model | newTimelinePeriod = period }, Cmd.none )
+            ( model, Cmd.none )
 
 
 type TimePoint
@@ -392,9 +396,12 @@ exampleVP =
     }
 
 
-viewTimeline : Timeline -> Html msg
+viewTimeline : Timeline -> Html Msg
 viewTimeline tl =
-    div [] [ text <| toString tl ]
+    div []
+        [ text <| toString tl
+        , Html.button [ Events.onClick <| RemoveTimeline tl.id ] [ Html.text " [x]" ]
+        ]
 
 
 viewBar : TimeLineBar -> Html msg
