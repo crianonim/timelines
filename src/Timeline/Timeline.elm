@@ -31,6 +31,7 @@ type Msg
     | RemovedTimeline Int (Result Http.Error ())
     | EditTimeline Int
     | AllPeriods
+    | SetPeriod Viewport
 
 
 init : ( Model, Cmd Msg )
@@ -152,6 +153,11 @@ update msg model =
                     , end = List.map .period model.timelines |> endOfListOfPeriods |> Maybe.withDefault (Year 2020)
                     }
             in
+            ( { model | viewPort = viewPort }
+            , Cmd.none
+            )
+
+        SetPeriod viewPort ->
             ( { model | viewPort = viewPort }
             , Cmd.none
             )
@@ -545,6 +551,12 @@ viewTimeline tl =
         [ text <| toString tl
         , Html.button [ Events.onClick <| RemoveTimeline tl.id ] [ Html.text " [x]" ]
         , Html.button [ Events.onClick <| EditTimeline tl.id ] [ Html.text " [edit]" ]
+        , case tl.period of
+            Closed p1 p2 ->
+                Html.button [ Events.onClick <| SetPeriod (Viewport p1 p2) ] [ Html.text " [set viewport]" ]
+
+            _ ->
+                Html.text ""
         ]
 
 
