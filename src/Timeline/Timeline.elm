@@ -30,6 +30,7 @@ type Msg
     | RemoveTimeline Int
     | RemovedTimeline Int (Result Http.Error ())
     | EditTimeline Int
+    | AllPeriods
 
 
 init : ( Model, Cmd Msg )
@@ -144,6 +145,17 @@ update msg model =
             , Cmd.none
             )
 
+        AllPeriods ->
+            let
+                viewPort =
+                    { start = List.map .period model.timelines |> startOfListOfPeriods |> Maybe.withDefault (Year 2000)
+                    , end = List.map .period model.timelines |> endOfListOfPeriods |> Maybe.withDefault (Year 2020)
+                    }
+            in
+            ( { model | viewPort = viewPort }
+            , Cmd.none
+            )
+
 
 type TimePoint
     = Year Int
@@ -215,6 +227,82 @@ firstTimePointOfPeriod period =
 
         Finished timePoint ->
             timePoint
+
+
+minTimePointOfPeriod : Period -> Maybe TimePoint
+minTimePointOfPeriod period =
+    case period of
+        Point timePoint ->
+            Just timePoint
+
+        Closed timePoint _ ->
+            Just timePoint
+
+        Started timePoint ->
+            Just timePoint
+
+        Finished _ ->
+            Nothing
+
+
+maxTimePointOfPeriod : Period -> Maybe TimePoint
+maxTimePointOfPeriod period =
+    case period of
+        Point timePoint ->
+            Just timePoint
+
+        Closed _ timePoint ->
+            Just timePoint
+
+        Started _ ->
+            Nothing
+
+        Finished timePoint ->
+            Just timePoint
+
+
+startOfListOfPeriods : List Period -> Maybe TimePoint
+startOfListOfPeriods periods =
+    periods
+        |> List.map minTimePointOfPeriod
+        |> List.foldl
+            (\x y ->
+                case ( x, y ) of
+                    ( Nothing, Nothing ) ->
+                        Nothing
+
+                    ( Just a, Nothing ) ->
+                        Just a
+
+                    ( Nothing, Just a ) ->
+                        Just a
+
+                    ( Just a, Just b ) ->
+                        Just <| timepointMin a b
+            )
+            Nothing
+
+
+endOfListOfPeriods : List Period -> Maybe TimePoint
+endOfListOfPeriods periods =
+    periods
+        |> List.map maxTimePointOfPeriod
+        |> List.foldl
+            (\x y ->
+                case ( x, y ) of
+                    ( Nothing, Nothing ) ->
+                        Nothing
+
+                    ( Just a, Nothing ) ->
+                        Just a
+
+                    ( Nothing, Just a ) ->
+                        Just a
+
+                    ( Just a, Just b ) ->
+                        Just <| timepointMax a b
+            )
+            Nothing
 
 
 timepointMin : TimePoint -> TimePoint -> TimePoint
@@ -424,7 +512,7 @@ timelineToTimelineBar { start, end } width ({ period, name } as tl) =
                     ( timePointToStartDate tp, viewportEnd )
 
                 Finished tp ->
-                    ( viewportStart, timePointToEndDate tp )
+                    ( viewportStart, Date.min (timePointToEndDate tp) viewportEnd )
 
         viewPortDays =
             Date.diff Date.Days viewportStart viewportEnd
@@ -624,7 +712,8 @@ view model =
             ]
         , div [] [ viewNewTimeline model.newTimelinePeriod model.newTimelineName model.isEditingId ]
         , div [ Attrs.class "flex gap-4" ]
-            [ div [] [ text "From:" ]
+            [ Html.button [ Events.onClick AllPeriods ] [ Html.text "ALL" ]
+            , div [] [ text "From:" ]
             , viewTimepointSelector { onSelected = UpdateStart, timepoint = model.viewPort.start }
             , div [] [ text "To:" ]
             , viewTimepointSelector { onSelected = UpdateEnd, timepoint = model.viewPort.end }
