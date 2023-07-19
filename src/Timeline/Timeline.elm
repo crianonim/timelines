@@ -32,6 +32,7 @@ type Msg
     | EditTimeline Int
     | AllPeriods
     | SetPeriod Viewport
+    | Sort
 
 
 init : ( Model, Cmd Msg )
@@ -159,6 +160,26 @@ update msg model =
 
         SetPeriod viewPort ->
             ( { model | viewPort = viewPort }
+            , Cmd.none
+            )
+
+        Sort ->
+            ( { model
+                | timelines =
+                    List.sortWith
+                        (\a b ->
+                            case ( minTimePointOfPeriod a.period, minTimePointOfPeriod b.period ) of
+                                ( _, Nothing ) ->
+                                    GT
+
+                                ( Nothing, _ ) ->
+                                    LT
+
+                                ( Just x, Just y ) ->
+                                    Date.compare (timePointToStartDate x) (timePointToStartDate y)
+                        )
+                        model.timelines
+              }
             , Cmd.none
             )
 
@@ -725,6 +746,7 @@ view model =
         , div [] [ viewNewTimeline model.newTimelinePeriod model.newTimelineName model.isEditingId ]
         , div [ Attrs.class "flex gap-4" ]
             [ Html.button [ Events.onClick AllPeriods ] [ Html.text "ALL" ]
+            , Html.button [ Events.onClick Sort ] [ Html.text "Sort" ]
             , div [] [ text "From:" ]
             , viewTimepointSelector { onSelected = UpdateStart, timepoint = model.viewPort.start }
             , div [] [ text "To:" ]
