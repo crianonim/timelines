@@ -198,5 +198,27 @@
       "id": 1,
       "name": "Jan"
     }
+  ],
+  "eras": [
+    {
+      "era": {
+        "name": "Wszystko",
+        "viewPort": {
+          "start": "1789",
+          "end": "2024-07-03"
+        }
+      },
+      "id": 1
+    },
+    {
+      "era": {
+        "name": "Testowa",
+        "viewPort": {
+          "start": "2020-03-13",
+          "end": "2023"
+        }
+      },
+      "id": 2
+    }
   ]
 }

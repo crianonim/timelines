@@ -5,8 +5,6 @@ import Html exposing (Attribute, Html, a, div, h1, h2, text)
 import Html.Attributes as Attrs exposing (href, style, title)
 import Html.Events as Events
 import Http
-import Json.Decode
-import Json.Encode
 import Time
 import Timeline.API exposing (Era, Period(..), PeriodType(..), TimePoint(..), Timeline, Viewport)
 
@@ -40,6 +38,7 @@ type Msg
     | SelectEra String
     | UpdateNewEraName String
     | AddNewEra
+    | SavedNewEra (Result Http.Error Era)
 
 
 init : ( Model, Cmd Msg )
@@ -49,11 +48,11 @@ init =
       , newTimelinePeriod = Point <| Year 2023
       , newTimelineName = ""
       , isEditingId = Nothing
-      , eras = [ { name = "Test", viewPort = exampleVP } ]
+      , eras = []
       , selectedEra = Nothing
       , newEraName = ""
       }
-    , getTimelines GotTimelines
+    , Timeline.API.getTimelines GotTimelines
     )
 
 
@@ -78,10 +77,10 @@ update msg model =
             ( model
             , case mId of
                 Nothing ->
-                    saveNewTimeline { id = 0, name = name, period = period } (SavedTimeline mId)
+                    Timeline.API.saveNewTimeline { id = 0, name = name, period = period } (SavedTimeline mId)
 
                 Just id ->
-                    saveEditTimeline { id = id, name = name, period = period } (SavedTimeline mId)
+                    Timeline.API.saveEditTimeline { id = id, name = name, period = period } (SavedTimeline mId)
             )
 
         SavedTimeline mId (Ok tl) ->
@@ -133,7 +132,7 @@ update msg model =
             ( { model | newTimelinePeriod = period }, Cmd.none )
 
         RemoveTimeline id ->
-            ( model, removeTimeline id (RemovedTimeline id) )
+            ( model, Timeline.API.removeTimeline id (RemovedTimeline id) )
 
         RemovedTimeline id (Ok ()) ->
             ( { model | timelines = List.filter (\tl -> tl.id /= id) model.timelines }, Cmd.none )
@@ -236,14 +235,18 @@ update msg model =
                     { name = model.newEraName
                     , viewPort = model.viewPort
                     }
-
-                _ =
-                    Debug.log "new Era" era
             in
-            ( { model | eras = model.eras ++ [ era ] }, Cmd.none )
+            ( { model | eras = model.eras ++ [ era ] }, Timeline.API.saveNewEra era SavedNewEra )
 
         UpdateNewEraName string ->
             ( { model | newEraName = string }, Cmd.none )
+
+        SavedNewEra result ->
+            let
+                _ =
+                    Debug.log "SAVED new era" result
+            in
+            ( model, Cmd.none )
 
 
 type alias TimeLineBar =
@@ -425,129 +428,6 @@ viewBar { timeline, start, length } =
         , title timeline.name
         ]
         []
-
-
-api =
-    "http://localhost:3000"
-
-
-getTimelines : (Result Http.Error (List Timeline) -> msg) -> Cmd msg
-getTimelines wrapMsg =
-    Http.get
-        { url = api ++ "/timelines"
-        , expect =
-            Http.expectJson wrapMsg <|
-                Json.Decode.list decodeTimeline
-        }
-
-
-saveNewTimeline : Timeline -> (Result Http.Error Timeline -> msg) -> Cmd msg
-saveNewTimeline timeline wrapMsg =
-    Http.post
-        { url = api ++ "/timelines"
-        , body = Http.jsonBody <| Json.Encode.object [ ( "timeline", encodeTimeline timeline ) ]
-        , expect = Http.expectJson wrapMsg decodeTimeline
-        }
-
-
-saveEditTimeline : Timeline -> (Result Http.Error Timeline -> msg) -> Cmd msg
-saveEditTimeline timeline wrapMsg =
-    Http.request
-        { method = "PATCH"
-        , headers = []
-        , url = api ++ "/timelines/" ++ String.fromInt timeline.id
-        , body = Http.jsonBody <| Json.Encode.object [ ( "timeline", encodeTimeline timeline ) ]
-        , expect = Http.expectJson wrapMsg decodeTimeline
-        , timeout = Nothing
-        , tracker = Nothing
-        }
-
-
-removeTimeline : Int -> (Result Http.Error () -> msg) -> Cmd msg
-removeTimeline id wrapMsg =
-    Http.request
-        { method = "DELETE"
-        , headers = []
-        , url = api ++ "/timelines/" ++ String.fromInt id
-        , body = Http.emptyBody
-        , expect = Http.expectWhatever wrapMsg
-        , timeout = Nothing
-        , tracker = Nothing
-        }
-
-
-encodePeriod : Period -> Json.Encode.Value
-encodePeriod period =
-    Timeline.API.periodToString period |> Json.Encode.string
-
-
-encodeTimeline : Timeline -> Json.Encode.Value
-encodeTimeline timeline =
-    Json.Encode.object <|
-        [ ( "period", encodePeriod timeline.period )
-        , ( "name", Json.Encode.string timeline.name )
-        ]
-
-
-stringToTimePoint : String -> Maybe TimePoint
-stringToTimePoint string =
-    case String.split "-" string of
-        [ yearStr, monthStr, dayStr ] ->
-            Maybe.map3 (\year month day -> YearMonthDay year month day)
-                (String.toInt yearStr)
-                (String.toInt monthStr |> Maybe.map Date.numberToMonth)
-                (String.toInt dayStr)
-
-        [ yearStr, monthStr ] ->
-            Maybe.map2 (\year month -> YearMonth year month)
-                (String.toInt yearStr)
-                (String.toInt monthStr |> Maybe.map Date.numberToMonth)
-
-        [ yearStr ] ->
-            Maybe.map Year (String.toInt yearStr)
-
-        _ ->
-            Nothing
-
-
-decodePeriod : Json.Decode.Decoder Period
-decodePeriod =
-    let
-        get id =
-            case String.split " - " id of
-                [ point ] ->
-                    stringToTimePoint point
-                        |> Maybe.map (Point >> Json.Decode.succeed)
-                        |> Maybe.withDefault (Json.Decode.fail "")
-
-                [ start, "" ] ->
-                    stringToTimePoint start
-                        |> Maybe.map (Started >> Json.Decode.succeed)
-                        |> Maybe.withDefault (Json.Decode.fail "")
-
-                [ "", end ] ->
-                    stringToTimePoint end
-                        |> Maybe.map (Finished >> Json.Decode.succeed)
-                        |> Maybe.withDefault (Json.Decode.fail "")
-
-                [ start, end ] ->
-                    Maybe.map2 (\s e -> Closed s e |> Json.Decode.succeed)
-                        (stringToTimePoint start)
-                        (stringToTimePoint end)
-                        |> Maybe.withDefault (Json.Decode.fail "")
-
-                _ ->
-                    Json.Decode.fail ("unknown value for Period: " ++ id)
-    in
-    Json.Decode.string |> Json.Decode.andThen get
-
-
-decodeTimeline : Json.Decode.Decoder Timeline
-decodeTimeline =
-    Json.Decode.map3 Timeline
-        (Json.Decode.field "id" Json.Decode.int)
-        (Json.Decode.at [ "timeline", "period" ] decodePeriod)
-        (Json.Decode.at [ "timeline", "name" ] Json.Decode.string)
 
 
 view : Model -> Html Msg
