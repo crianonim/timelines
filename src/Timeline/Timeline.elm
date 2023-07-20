@@ -65,14 +65,24 @@ update msg model =
                 vp =
                     model.viewPort
             in
-            ( { model | viewPort = { vp | start = Timeline.API.timepointMin s vp.end } }, Cmd.none )
+            ( { model
+                | viewPort = { vp | start = Timeline.API.timepointMin s vp.end }
+                , selectedEra = Nothing
+              }
+            , Cmd.none
+            )
 
         UpdateEnd s ->
             let
                 vp =
                     model.viewPort
             in
-            ( { model | viewPort = { vp | end = Timeline.API.timepointMax s vp.start } }, Cmd.none )
+            ( { model
+                | viewPort = { vp | end = Timeline.API.timepointMax s vp.start }
+                , selectedEra = Nothing
+              }
+            , Cmd.none
+            )
 
         SaveTimeline mId period name ->
             ( model
@@ -670,7 +680,18 @@ viewNewTimeline period name isEditingId =
 viewEras : List Era -> Maybe Era -> String -> Html Msg
 viewEras eras maybeEra newEraName =
     Html.div []
-        [ Html.select [ Events.onInput SelectEra ] (Html.option [] [ Html.text "--" ] :: List.indexedMap (\i e -> Html.option [ Attrs.value <| String.fromInt i ] [ Html.text e.name ]) eras)
+        [ Html.select [ Events.onInput SelectEra ]
+            (Html.option [] [ Html.text "--" ]
+                :: List.indexedMap
+                    (\i e ->
+                        Html.option
+                            [ Attrs.value <| String.fromInt i
+                            , Attrs.selected (Just e == maybeEra)
+                            ]
+                            [ Html.text e.name ]
+                    )
+                    eras
+            )
         , Html.input [ Events.onInput UpdateNewEraName, Attrs.value newEraName ] []
         , Html.button [ Events.onClick AddNewEra ] [ Html.text "New Era" ]
         ]
