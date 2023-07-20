@@ -225,15 +225,9 @@ update msg model =
         SelectEra eraId ->
             let
                 era =
-                    List.indexedMap Tuple.pair model.eras
-                        |> List.filterMap
-                            (\( id, e ) ->
-                                if Just id == String.toInt eraId then
-                                    Just e
-
-                                else
-                                    Nothing
-                            )
+                    model.eras
+                        |> List.filter
+                            (\e -> Just e.id == String.toInt eraId)
                         |> List.head
             in
             ( { model | selectedEra = era, viewPort = Maybe.map .viewPort era |> Maybe.withDefault model.viewPort }
@@ -245,6 +239,7 @@ update msg model =
                 era =
                     { name = model.newEraName
                     , viewPort = model.viewPort
+                    , id = -100
                     }
             in
             ( { model | eras = model.eras ++ [ era ] }, Timeline.API.saveNewEra era SavedNewEra )
@@ -682,10 +677,10 @@ viewEras eras maybeEra newEraName =
     Html.div []
         [ Html.select [ Events.onInput SelectEra ]
             (Html.option [] [ Html.text "--" ]
-                :: List.indexedMap
-                    (\i e ->
+                :: List.map
+                    (\e ->
                         Html.option
-                            [ Attrs.value <| String.fromInt i
+                            [ Attrs.value <| String.fromInt e.id
                             , Attrs.selected (Just e == maybeEra)
                             ]
                             [ Html.text e.name ]

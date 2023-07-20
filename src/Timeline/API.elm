@@ -41,7 +41,8 @@ type alias Timeline =
 
 
 type alias Era =
-    { name : String
+    { id : Int
+    , name : String
     , viewPort : Viewport
     }
 
@@ -391,9 +392,10 @@ decodeTimeline =
 
 decodeEra : Json.Decode.Decoder Era
 decodeEra =
-    Json.Decode.map2 Era
-        (Json.Decode.field "name" Json.Decode.string)
-        (Json.Decode.field "viewPort" viewportDecoder)
+    Json.Decode.map3 Era
+        (Json.Decode.field "id" Json.Decode.int)
+        (Json.Decode.at [ "era", "name" ] Json.Decode.string)
+        (Json.Decode.at [ "era", "viewPort" ] viewportDecoder)
 
 
 timePointDecoder : Json.Decode.Decoder TimePoint
@@ -449,5 +451,5 @@ getEras wrapMsg =
         { url = api ++ "/eras"
         , expect =
             Http.expectJson wrapMsg <|
-                Json.Decode.list (Json.Decode.field "era" decodeEra)
+                Json.Decode.list decodeEra
         }
