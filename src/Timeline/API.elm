@@ -37,6 +37,12 @@ type alias Timeline =
     }
 
 
+type alias Era =
+    { name : String
+    , viewPort : Viewport
+    }
+
+
 periodToPeriodType : Period -> PeriodType
 periodToPeriodType period =
     case period of

@@ -8,7 +8,7 @@ import Http
 import Json.Decode
 import Json.Encode
 import Time
-import Timeline.API exposing (Period(..), PeriodType(..), TimePoint(..), Timeline, Viewport)
+import Timeline.API exposing (Era, Period(..), PeriodType(..), TimePoint(..), Timeline, Viewport)
 
 
 type alias Model =
@@ -17,6 +17,8 @@ type alias Model =
     , newTimelinePeriod : Period
     , newTimelineName : String
     , isEditingId : Maybe Int
+    , eras : List Era
+    , selectedEra : Maybe Era
     }
 
 
@@ -34,11 +36,21 @@ type Msg
     | AllPeriods
     | SetPeriod Viewport
     | Sort
+    | SelectEra String
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { timelines = [], viewPort = exampleVP, newTimelinePeriod = Point <| Year 2023, newTimelineName = "", isEditingId = Nothing }, getTimelines GotTimelines )
+    ( { timelines = []
+      , viewPort = exampleVP
+      , newTimelinePeriod = Point <| Year 2023
+      , newTimelineName = ""
+      , isEditingId = Nothing
+      , eras = [ { name = "Test", viewPort = exampleVP } ]
+      , selectedEra = Nothing
+      }
+    , getTimelines GotTimelines
+    )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -193,6 +205,24 @@ update msg model =
                         )
                         model.timelines
               }
+            , Cmd.none
+            )
+
+        SelectEra eraId ->
+            let
+                era =
+                    List.indexedMap Tuple.pair model.eras
+                        |> List.filterMap
+                            (\( id, e ) ->
+                                if Just id == String.toInt eraId then
+                                    Just e
+
+                                else
+                                    Nothing
+                            )
+                        |> List.head
+            in
+            ( { model | selectedEra = era, viewPort = Maybe.map .viewPort era |> Maybe.withDefault model.viewPort }
             , Cmd.none
             )
 
@@ -515,6 +545,7 @@ view model =
             , viewTimepointSelector { onSelected = UpdateStart, timepoint = model.viewPort.start }
             , div [] [ text "To:" ]
             , viewTimepointSelector { onSelected = UpdateEnd, timepoint = model.viewPort.end }
+            , viewEras model.eras model.selectedEra
             ]
         , div
             [ Attrs.class "border border-slate-500  m-2"
@@ -723,4 +754,11 @@ viewNewTimeline period name isEditingId =
 
         --, viewTimepointSelector { timepoint = firstTimePointOfPeriod period, onSelected = UpdateNewTimelinePeriod }
         , Html.button [ Events.onClick message ] [ Html.text buttonLabel ]
+        ]
+
+
+viewEras : List Era -> Maybe Era -> Html Msg
+viewEras eras maybeEra =
+    Html.div []
+        [ Html.select [ Events.onInput SelectEra ] (Html.option [] [ Html.text "--" ] :: List.indexedMap (\i e -> Html.option [ Attrs.value <| String.fromInt i ] [ Html.text e.name ]) eras)
         ]
