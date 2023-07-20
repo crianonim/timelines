@@ -816,8 +816,8 @@ viewTimepointSelector config =
                 Year _ ->
                     Nothing
 
-                YearMonth int month ->
-                    Just <| daysInAMonth int month
+                YearMonth year month ->
+                    Just <| daysInAMonth year month
 
                 YearMonthDay year month _ ->
                     Just <| daysInAMonth year month
@@ -852,6 +852,12 @@ viewTimepointSelector config =
             String.toInt dayString
                 |> Maybe.map (\d -> YearMonthDay year month d)
                 |> Maybe.withDefault (YearMonth year month)
+
+        daysOption currentDay days =
+            Html.option [] [ Html.text emptyValue ]
+                :: (List.range 1 days
+                        |> List.map (\m -> Html.option [ Attrs.selected (m == currentDay) ] [ Html.text <| String.fromInt m ])
+                   )
     in
     Html.div []
         [ Html.input
@@ -875,27 +881,22 @@ viewTimepointSelector config =
                 Html.text ""
 
             Just d ->
-                (case config.timepoint of
+                case config.timepoint of
                     YearMonthDay year month currentDay ->
                         Html.select
-                            [ Attrs.value <| String.fromInt currentDay
-                            , Events.onInput (dayListener year month >> config.onSelected)
+                            [ Events.onInput (dayListener year month >> config.onSelected)
                             ]
+                            (daysOption currentDay d)
 
                     YearMonth year month ->
                         Html.select
                             [ Attrs.value emptyValue
                             , Events.onInput (dayListener year month >> config.onSelected)
                             ]
+                            (daysOption 0 d)
 
                     _ ->
-                        Html.div []
-                )
-                    (Html.option [] [ Html.text emptyValue ]
-                        :: (List.range 1 d
-                                |> List.map (\m -> Html.option [] [ Html.text <| String.fromInt m ])
-                           )
-                    )
+                        Html.text ""
         ]
 
 
