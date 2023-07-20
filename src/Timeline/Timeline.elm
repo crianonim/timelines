@@ -84,6 +84,8 @@ update msg model =
 
                         Nothing ->
                             model.timelines ++ [ tl ]
+                , isEditingId = Nothing
+                , newTimelineName = ""
               }
             , Cmd.none
             )
@@ -498,7 +500,7 @@ isInViewport { start, end } period =
                 periodStart =
                     timePointToStartDate tp
             in
-            Date.compare periodStart viewportEnd == LT || Date.compare periodStart viewportStart == EQ
+            Date.compare periodStart viewportEnd == LT || Date.compare periodStart viewportEnd == EQ
 
         Finished tp ->
             let

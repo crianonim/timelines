@@ -23,7 +23,7 @@
     },
     {
       "timeline": {
-        "period": "1952 - 2022",
+        "period": "1952-02-06 - 2022-09-08",
         "name": "Queen Elizabeth II reign"
       },
       "id": 4
@@ -139,6 +139,48 @@
         "name": "Future2"
       },
       "id": 26
+    },
+    {
+      "timeline": {
+        "period": "1901-01-22 - 1910-05-06",
+        "name": "Edward VII's reign"
+      },
+      "id": 27
+    },
+    {
+      "timeline": {
+        "period": "1837-06-20 - 1901-01-22",
+        "name": "Victoria's reign"
+      },
+      "id": 28
+    },
+    {
+      "timeline": {
+        "period": "1910-05-06 - 1936-01-20",
+        "name": "George V's reign"
+      },
+      "id": 29
+    },
+    {
+      "timeline": {
+        "period": "1936-01-20 - 1936-12-11",
+        "name": "Edward VII's reign"
+      },
+      "id": 30
+    },
+    {
+      "timeline": {
+        "period": "1936-12-11 - 1952-02-06",
+        "name": "George VI's reign"
+      },
+      "id": 31
+    },
+    {
+      "timeline": {
+        "period": "2022-09-08 - ",
+        "name": "Charles III's reign"
+      },
+      "id": 32
     }
   ],
   "notes": [
