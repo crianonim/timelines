@@ -441,3 +441,13 @@ saveNewEra era wrapMsg =
         , body = Http.jsonBody <| Json.Encode.object [ ( "era", encodeEra era ) ]
         , expect = Http.expectJson wrapMsg decodeEra
         }
+
+
+getEras : (Result Http.Error (List Era) -> msg) -> Cmd msg
+getEras wrapMsg =
+    Http.get
+        { url = api ++ "/eras"
+        , expect =
+            Http.expectJson wrapMsg <|
+                Json.Decode.list (Json.Decode.field "era" decodeEra)
+        }

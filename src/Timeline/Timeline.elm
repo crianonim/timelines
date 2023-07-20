@@ -39,6 +39,7 @@ type Msg
     | UpdateNewEraName String
     | AddNewEra
     | SavedNewEra (Result Http.Error Era)
+    | GotEras (Result Http.Error (List Era))
 
 
 init : ( Model, Cmd Msg )
@@ -52,7 +53,7 @@ init =
       , selectedEra = Nothing
       , newEraName = ""
       }
-    , Timeline.API.getTimelines GotTimelines
+    , Cmd.batch [ Timeline.API.getTimelines GotTimelines, Timeline.API.getEras GotEras ]
     )
 
 
@@ -245,6 +246,16 @@ update msg model =
             let
                 _ =
                     Debug.log "SAVED new era" result
+            in
+            ( model, Cmd.none )
+
+        GotEras (Ok eras) ->
+            ( { model | eras = eras }, Cmd.none )
+
+        GotEras (Err err) ->
+            let
+                _ =
+                    Debug.log "Error in getting eras" err
             in
             ( model, Cmd.none )
 
