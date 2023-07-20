@@ -8,7 +8,7 @@ import Html.Attributes as Attrs exposing (href, style, type_, value)
 import Html.Events exposing (onInput)
 import Notes.Notes as Notes
 import Platform.Cmd exposing (Cmd)
-import Timeline.Timeline as Timeline exposing (Timeline)
+import Timeline.Timeline as Timeline
 import Url exposing (Url)
 import Url.Parser as Parser exposing ((</>))
 
