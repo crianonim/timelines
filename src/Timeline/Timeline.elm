@@ -19,6 +19,7 @@ type alias Model =
     , isEditingId : Maybe Int
     , eras : List Era
     , selectedEra : Maybe Era
+    , newEraName : String
     }
 
 
@@ -37,6 +38,8 @@ type Msg
     | SetPeriod Viewport
     | Sort
     | SelectEra String
+    | UpdateNewEraName String
+    | AddNewEra
 
 
 init : ( Model, Cmd Msg )
@@ -48,6 +51,7 @@ init =
       , isEditingId = Nothing
       , eras = [ { name = "Test", viewPort = exampleVP } ]
       , selectedEra = Nothing
+      , newEraName = ""
       }
     , getTimelines GotTimelines
     )
@@ -225,6 +229,21 @@ update msg model =
             ( { model | selectedEra = era, viewPort = Maybe.map .viewPort era |> Maybe.withDefault model.viewPort }
             , Cmd.none
             )
+
+        AddNewEra ->
+            let
+                era =
+                    { name = model.newEraName
+                    , viewPort = model.viewPort
+                    }
+
+                _ =
+                    Debug.log "new Era" era
+            in
+            ( { model | eras = model.eras ++ [ era ] }, Cmd.none )
+
+        UpdateNewEraName string ->
+            ( { model | newEraName = string }, Cmd.none )
 
 
 type alias TimeLineBar =
@@ -545,7 +564,7 @@ view model =
             , viewTimepointSelector { onSelected = UpdateStart, timepoint = model.viewPort.start }
             , div [] [ text "To:" ]
             , viewTimepointSelector { onSelected = UpdateEnd, timepoint = model.viewPort.end }
-            , viewEras model.eras model.selectedEra
+            , viewEras model.eras model.selectedEra model.newEraName
             ]
         , div
             [ Attrs.class "border border-slate-500  m-2"
@@ -757,8 +776,10 @@ viewNewTimeline period name isEditingId =
         ]
 
 
-viewEras : List Era -> Maybe Era -> Html Msg
-viewEras eras maybeEra =
+viewEras : List Era -> Maybe Era -> String -> Html Msg
+viewEras eras maybeEra newEraName =
     Html.div []
         [ Html.select [ Events.onInput SelectEra ] (Html.option [] [ Html.text "--" ] :: List.indexedMap (\i e -> Html.option [ Attrs.value <| String.fromInt i ] [ Html.text e.name ]) eras)
+        , Html.input [ Events.onInput UpdateNewEraName, Attrs.value newEraName ] []
+        , Html.button [ Events.onClick AddNewEra ] [ Html.text "New Era" ]
         ]
