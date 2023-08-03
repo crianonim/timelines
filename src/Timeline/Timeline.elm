@@ -5,10 +5,8 @@ import Html exposing (Attribute, Html, a, div, h1, h2, text)
 import Html.Attributes as Attrs exposing (href, style, title)
 import Html.Events as Events
 import Http
-import Json.Decode
-import Json.Encode
 import Time
-import Timeline.API exposing (Period(..), PeriodType(..), TimePoint(..), Timeline, Viewport)
+import Timeline.API exposing (Era, Period(..), PeriodType(..), TimePoint(..), Timeline, Viewport)
 
 
 type alias Model =
@@ -17,6 +15,9 @@ type alias Model =
     , newTimelinePeriod : Period
     , newTimelineName : String
     , isEditingId : Maybe Int
+    , eras : List Era
+    , selectedEra : Maybe Era
+    , newEraName : String
     }
 
 
@@ -34,11 +35,26 @@ type Msg
     | AllPeriods
     | SetPeriod Viewport
     | Sort
+    | SelectEra String
+    | UpdateNewEraName String
+    | AddNewEra
+    | SavedNewEra (Result Http.Error Era)
+    | GotEras (Result Http.Error (List Era))
 
 
 init : ( Model, Cmd Msg )
 init =
-    ( { timelines = [], viewPort = exampleVP, newTimelinePeriod = Point <| Year 2023, newTimelineName = "", isEditingId = Nothing }, getTimelines GotTimelines )
+    ( { timelines = []
+      , viewPort = exampleVP
+      , newTimelinePeriod = Point <| Year 2023
+      , newTimelineName = ""
+      , isEditingId = Nothing
+      , eras = []
+      , selectedEra = Nothing
+      , newEraName = ""
+      }
+    , Cmd.batch [ Timeline.API.getTimelines GotTimelines, Timeline.API.getEras GotEras ]
+    )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -49,23 +65,33 @@ update msg model =
                 vp =
                     model.viewPort
             in
-            ( { model | viewPort = { vp | start = Timeline.API.timepointMin s vp.end } }, Cmd.none )
+            ( { model
+                | viewPort = { vp | start = Timeline.API.timepointMin s vp.end }
+                , selectedEra = Nothing
+              }
+            , Cmd.none
+            )
 
         UpdateEnd s ->
             let
                 vp =
                     model.viewPort
             in
-            ( { model | viewPort = { vp | end = Timeline.API.timepointMax s vp.start } }, Cmd.none )
+            ( { model
+                | viewPort = { vp | end = Timeline.API.timepointMax s vp.start }
+                , selectedEra = Nothing
+              }
+            , Cmd.none
+            )
 
         SaveTimeline mId period name ->
             ( model
             , case mId of
                 Nothing ->
-                    saveNewTimeline { id = 0, name = name, period = period } (SavedTimeline mId)
+                    Timeline.API.saveNewTimeline { id = 0, name = name, period = period } (SavedTimeline mId)
 
                 Just id ->
-                    saveEditTimeline { id = id, name = name, period = period } (SavedTimeline mId)
+                    Timeline.API.saveEditTimeline { id = id, name = name, period = period } (SavedTimeline mId)
             )
 
         SavedTimeline mId (Ok tl) ->
@@ -117,7 +143,7 @@ update msg model =
             ( { model | newTimelinePeriod = period }, Cmd.none )
 
         RemoveTimeline id ->
-            ( model, removeTimeline id (RemovedTimeline id) )
+            ( model, Timeline.API.removeTimeline id (RemovedTimeline id) )
 
         RemovedTimeline id (Ok ()) ->
             ( { model | timelines = List.filter (\tl -> tl.id /= id) model.timelines }, Cmd.none )
@@ -196,6 +222,48 @@ update msg model =
             , Cmd.none
             )
 
+        SelectEra eraId ->
+            let
+                era =
+                    model.eras
+                        |> List.filter
+                            (\e -> Just e.id == String.toInt eraId)
+                        |> List.head
+            in
+            ( { model | selectedEra = era, viewPort = Maybe.map .viewPort era |> Maybe.withDefault model.viewPort }
+            , Cmd.none
+            )
+
+        AddNewEra ->
+            let
+                era =
+                    { name = model.newEraName
+                    , viewPort = model.viewPort
+                    , id = -100
+                    }
+            in
+            ( { model | eras = model.eras ++ [ era ] }, Timeline.API.saveNewEra era SavedNewEra )
+
+        UpdateNewEraName string ->
+            ( { model | newEraName = string }, Cmd.none )
+
+        SavedNewEra result ->
+            let
+                _ =
+                    Debug.log "SAVED new era" result
+            in
+            ( model, Cmd.none )
+
+        GotEras (Ok eras) ->
+            ( { model | eras = eras }, Cmd.none )
+
+        GotEras (Err err) ->
+            let
+                _ =
+                    Debug.log "Error in getting eras" err
+            in
+            ( model, Cmd.none )
+
 
 type alias TimeLineBar =
     { start : Maybe Float
@@ -204,6 +272,7 @@ type alias TimeLineBar =
     }
 
 
+data : List Timeline
 data =
     [ Timeline 0 (Point <| YearMonthDay 1980 Time.Jun 6) "Jan's Birthday"
     , Timeline 1 (Closed (Year 1995) (Year 1999)) "High School"
@@ -378,129 +447,6 @@ viewBar { timeline, start, length } =
         []
 
 
-api =
-    "http://localhost:3000"
-
-
-getTimelines : (Result Http.Error (List Timeline) -> msg) -> Cmd msg
-getTimelines wrapMsg =
-    Http.get
-        { url = api ++ "/timelines"
-        , expect =
-            Http.expectJson wrapMsg <|
-                Json.Decode.list decodeTimeline
-        }
-
-
-saveNewTimeline : Timeline -> (Result Http.Error Timeline -> msg) -> Cmd msg
-saveNewTimeline timeline wrapMsg =
-    Http.post
-        { url = api ++ "/timelines"
-        , body = Http.jsonBody <| Json.Encode.object [ ( "timeline", encodeTimeline timeline ) ]
-        , expect = Http.expectJson wrapMsg decodeTimeline
-        }
-
-
-saveEditTimeline : Timeline -> (Result Http.Error Timeline -> msg) -> Cmd msg
-saveEditTimeline timeline wrapMsg =
-    Http.request
-        { method = "PATCH"
-        , headers = []
-        , url = api ++ "/timelines/" ++ String.fromInt timeline.id
-        , body = Http.jsonBody <| Json.Encode.object [ ( "timeline", encodeTimeline timeline ) ]
-        , expect = Http.expectJson wrapMsg decodeTimeline
-        , timeout = Nothing
-        , tracker = Nothing
-        }
-
-
-removeTimeline : Int -> (Result Http.Error () -> msg) -> Cmd msg
-removeTimeline id wrapMsg =
-    Http.request
-        { method = "DELETE"
-        , headers = []
-        , url = api ++ "/timelines/" ++ String.fromInt id
-        , body = Http.emptyBody
-        , expect = Http.expectWhatever wrapMsg
-        , timeout = Nothing
-        , tracker = Nothing
-        }
-
-
-encodePeriod : Period -> Json.Encode.Value
-encodePeriod period =
-    Timeline.API.periodToString period |> Json.Encode.string
-
-
-encodeTimeline : Timeline -> Json.Encode.Value
-encodeTimeline timeline =
-    Json.Encode.object <|
-        [ ( "period", encodePeriod timeline.period )
-        , ( "name", Json.Encode.string timeline.name )
-        ]
-
-
-stringToTimePoint : String -> Maybe TimePoint
-stringToTimePoint string =
-    case String.split "-" string of
-        [ yearStr, monthStr, dayStr ] ->
-            Maybe.map3 (\year month day -> YearMonthDay year month day)
-                (String.toInt yearStr)
-                (String.toInt monthStr |> Maybe.map Date.numberToMonth)
-                (String.toInt dayStr)
-
-        [ yearStr, monthStr ] ->
-            Maybe.map2 (\year month -> YearMonth year month)
-                (String.toInt yearStr)
-                (String.toInt monthStr |> Maybe.map Date.numberToMonth)
-
-        [ yearStr ] ->
-            Maybe.map Year (String.toInt yearStr)
-
-        _ ->
-            Nothing
-
-
-decodePeriod : Json.Decode.Decoder Period
-decodePeriod =
-    let
-        get id =
-            case String.split " - " id of
-                [ point ] ->
-                    stringToTimePoint point
-                        |> Maybe.map (Point >> Json.Decode.succeed)
-                        |> Maybe.withDefault (Json.Decode.fail "")
-
-                [ start, "" ] ->
-                    stringToTimePoint start
-                        |> Maybe.map (Started >> Json.Decode.succeed)
-                        |> Maybe.withDefault (Json.Decode.fail "")
-
-                [ "", end ] ->
-                    stringToTimePoint end
-                        |> Maybe.map (Finished >> Json.Decode.succeed)
-                        |> Maybe.withDefault (Json.Decode.fail "")
-
-                [ start, end ] ->
-                    Maybe.map2 (\s e -> Closed s e |> Json.Decode.succeed)
-                        (stringToTimePoint start)
-                        (stringToTimePoint end)
-                        |> Maybe.withDefault (Json.Decode.fail "")
-
-                _ ->
-                    Json.Decode.fail ("unknown value for Period: " ++ id)
-    in
-    Json.Decode.string |> Json.Decode.andThen get
-
-
-decodeTimeline : Json.Decode.Decoder Timeline
-decodeTimeline =
-    Json.Decode.map3 Timeline
-        (Json.Decode.field "id" Json.Decode.int)
-        (Json.Decode.at [ "timeline", "period" ] decodePeriod)
-        (Json.Decode.at [ "timeline", "name" ] Json.Decode.string)
-
-
 view : Model -> Html Msg
 view model =
     div []
@@ -515,6 +461,7 @@ view model =
             , viewTimepointSelector { onSelected = UpdateStart, timepoint = model.viewPort.start }
             , div [] [ text "To:" ]
             , viewTimepointSelector { onSelected = UpdateEnd, timepoint = model.viewPort.end }
+            , viewEras model.eras model.selectedEra model.newEraName
             ]
         , div
             [ Attrs.class "border border-slate-500  m-2"
@@ -552,6 +499,7 @@ view model =
         ]
 
 
+allMonths : List Date.Month
 allMonths =
     List.range 1 12 |> List.map Date.numberToMonth
 
@@ -723,4 +671,24 @@ viewNewTimeline period name isEditingId =
 
         --, viewTimepointSelector { timepoint = firstTimePointOfPeriod period, onSelected = UpdateNewTimelinePeriod }
         , Html.button [ Events.onClick message ] [ Html.text buttonLabel ]
+        ]
+
+
+viewEras : List Era -> Maybe Era -> String -> Html Msg
+viewEras eras maybeEra newEraName =
+    Html.div []
+        [ Html.select [ Events.onInput SelectEra ]
+            (Html.option [] [ Html.text "--" ]
+                :: List.map
+                    (\e ->
+                        Html.option
+                            [ Attrs.value <| String.fromInt e.id
+                            , Attrs.selected (Just e == maybeEra)
+                            ]
+                            [ Html.text e.name ]
+                    )
+                    eras
+            )
+        , Html.input [ Events.onInput UpdateNewEraName, Attrs.value newEraName ] []
+        , Html.button [ Events.onClick AddNewEra ] [ Html.text "New Era" ]
         ]

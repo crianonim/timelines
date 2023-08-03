@@ -9,6 +9,7 @@
     "build": "parcel build --no-source-maps",
     "watch": "parcel watch --no-source-maps",
     "json-server": "json-server db.json",
+    "serve" : "http-server dist -c-1",
     "test": "elm-test"
   },
   "license": "UNLICENSED",
