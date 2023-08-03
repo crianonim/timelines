@@ -272,6 +272,7 @@ type alias TimeLineBar =
     }
 
 
+data : List Timeline
 data =
     [ Timeline 0 (Point <| YearMonthDay 1980 Time.Jun 6) "Jan's Birthday"
     , Timeline 1 (Closed (Year 1995) (Year 1999)) "High School"
@@ -498,6 +499,7 @@ view model =
         ]
 
 
+allMonths : List Date.Month
 allMonths =
     List.range 1 12 |> List.map Date.numberToMonth
 
