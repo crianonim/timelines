@@ -263,8 +263,14 @@ toString { period, name } =
         ++ periodToString period
 
 
+api : String
 api =
-    "http://localhost:3000"
+    "http://localhost:54321/rest/v1"
+
+
+representationHeader : Http.Header
+representationHeader =
+    Http.header "Prefer" "return=representation"
 
 
 getTimelines : (Result Http.Error (List Timeline) -> msg) -> Cmd msg
@@ -279,10 +285,14 @@ getTimelines wrapMsg =
 
 saveNewTimeline : Timeline -> (Result Http.Error Timeline -> msg) -> Cmd msg
 saveNewTimeline timeline wrapMsg =
-    Http.post
-        { url = api ++ "/timelines"
-        , body = Http.jsonBody <| Json.Encode.object [ ( "timeline", encodeTimeline timeline ) ]
-        , expect = Http.expectJson wrapMsg decodeTimeline
+    Http.request
+        { method = "POST"
+        , headers = [ representationHeader ]
+        , url = api ++ "/timelines"
+        , body = Http.jsonBody <| encodeTimeline timeline
+        , expect = Http.expectJson wrapMsg <| Json.Decode.index 0 decodeTimeline
+        , timeout = Nothing
+        , tracker = Nothing
         }
 
 
@@ -290,10 +300,10 @@ saveEditTimeline : Timeline -> (Result Http.Error Timeline -> msg) -> Cmd msg
 saveEditTimeline timeline wrapMsg =
     Http.request
         { method = "PATCH"
-        , headers = []
-        , url = api ++ "/timelines/" ++ String.fromInt timeline.id
-        , body = Http.jsonBody <| Json.Encode.object [ ( "timeline", encodeTimeline timeline ) ]
-        , expect = Http.expectJson wrapMsg decodeTimeline
+        , headers = [ representationHeader ]
+        , url = api ++ "/timelines?id=eq." ++ String.fromInt timeline.id
+        , body = Http.jsonBody <| encodeTimeline timeline
+        , expect = Http.expectJson wrapMsg <| Json.Decode.index 0 decodeTimeline
         , timeout = Nothing
         , tracker = Nothing
         }
@@ -304,7 +314,7 @@ removeTimeline id wrapMsg =
     Http.request
         { method = "DELETE"
         , headers = []
-        , url = api ++ "/timelines/" ++ String.fromInt id
+        , url = api ++ "/timelines?id=eq." ++ String.fromInt id
         , body = Http.emptyBody
         , expect = Http.expectWhatever wrapMsg
         , timeout = Nothing
@@ -382,8 +392,8 @@ decodeTimeline : Json.Decode.Decoder Timeline
 decodeTimeline =
     Json.Decode.map3 Timeline
         (Json.Decode.field "id" Json.Decode.int)
-        (Json.Decode.at [ "timeline", "period" ] decodePeriod)
-        (Json.Decode.at [ "timeline", "name" ] Json.Decode.string)
+        (Json.Decode.field "period" decodePeriod)
+        (Json.Decode.field "name" Json.Decode.string)
 
 
 
@@ -394,8 +404,15 @@ decodeEra : Json.Decode.Decoder Era
 decodeEra =
     Json.Decode.map3 Era
         (Json.Decode.field "id" Json.Decode.int)
-        (Json.Decode.at [ "era", "name" ] Json.Decode.string)
-        (Json.Decode.at [ "era", "viewPort" ] viewportDecoder)
+        (Json.Decode.field "name" Json.Decode.string)
+        viewportDecoder2
+
+
+viewportDecoder2 : Json.Decode.Decoder Viewport
+viewportDecoder2 =
+    Json.Decode.map2 Viewport
+        (Json.Decode.field "erastart" timePointDecoder)
+        (Json.Decode.field "eraend" timePointDecoder)
 
 
 timePointDecoder : Json.Decode.Decoder TimePoint
@@ -413,35 +430,25 @@ encodeTimePoint =
     timePointToString >> Json.Encode.string
 
 
-encodeViewPort : Viewport -> Json.Encode.Value
-encodeViewPort viewport =
-    Json.Encode.object <|
-        [ ( "start", encodeTimePoint viewport.start )
-        , ( "end", encodeTimePoint viewport.end )
-        ]
-
-
 encodeEra : Era -> Json.Encode.Value
 encodeEra era =
     Json.Encode.object <|
         [ ( "name", Json.Encode.string era.name )
-        , ( "viewPort", encodeViewPort era.viewPort )
+        , ( "erastart", encodeTimePoint era.viewPort.start )
+        , ( "eraend", encodeTimePoint era.viewPort.end )
         ]
-
-
-viewportDecoder : Json.Decode.Decoder Viewport
-viewportDecoder =
-    Json.Decode.map2 Viewport
-        (Json.Decode.field "start" timePointDecoder)
-        (Json.Decode.field "end" timePointDecoder)
 
 
 saveNewEra : Era -> (Result Http.Error Era -> msg) -> Cmd msg
 saveNewEra era wrapMsg =
-    Http.post
-        { url = api ++ "/eras"
-        , body = Http.jsonBody <| Json.Encode.object [ ( "era", encodeEra era ) ]
-        , expect = Http.expectJson wrapMsg decodeEra
+    Http.request
+        { method = "POST"
+        , headers = [ representationHeader ]
+        , url = api ++ "/eras"
+        , body = Http.jsonBody <| encodeEra era
+        , expect = Http.expectJson wrapMsg <| Json.Decode.index 0 decodeEra
+        , timeout = Nothing
+        , tracker = Nothing
         }
 
 
