@@ -22,6 +22,7 @@ type alias Model =
     , newEraName : String
     , tags : Set String
     , selectedTag : Maybe String
+    , newTag : String
     }
 
 
@@ -46,6 +47,8 @@ type Msg
     | GotEras (Result Http.Error (List Era))
     | ToggleTag Bool String
     | SelectTag String
+    | UpdateNewTag String
+    | AddNewTag
 
 
 init : ( Model, Cmd Msg )
@@ -61,6 +64,7 @@ init =
       , newEraName = ""
       , tags = Set.empty
       , selectedTag = Nothing
+      , newTag = ""
       }
     , Cmd.batch [ Timeline.API.getTimelines GotTimelines, Timeline.API.getEras GotEras ]
     )
@@ -300,6 +304,19 @@ update msg model =
                         |> List.head
             in
             ( { model | selectedTag = selectedTag }
+            , Cmd.none
+            )
+
+        UpdateNewTag tagName ->
+            ( { model | newTag = tagName }
+            , Cmd.none
+            )
+
+        AddNewTag ->
+            ( { model
+                | tags = Set.insert model.newTag model.tags
+                , newTag = ""
+              }
             , Cmd.none
             )
 
@@ -727,8 +744,12 @@ viewNewTimeline model period name tags isEditingId =
         , Html.div [] [ Html.text "TAGS" ]
         , div []
             [ div [ Attrs.class "flex gap-4" ]
-                (List.map (\tag -> Html.div [ Attrs.class "flex gap-1" ] [ Html.input [ Attrs.type_ "checkbox", Attrs.checked (Set.member tag tags), Events.onClick <| ToggleTag (not (Set.member tag tags)) tag ] [], Html.text tag ])
-                    (Set.toList model.tags)
+                (div [ Attrs.class "flex gap-2" ]
+                    [ Html.input [ Attrs.value model.newTag, Events.onInput UpdateNewTag ] []
+                    , Html.button [ Events.onClick AddNewTag ] [ Html.text "Add New" ]
+                    ]
+                    :: List.map (\tag -> Html.div [ Attrs.class "flex gap-1" ] [ Html.input [ Attrs.type_ "checkbox", Attrs.checked (Set.member tag tags), Events.onClick <| ToggleTag (not (Set.member tag tags)) tag ] [], Html.text tag ])
+                        (Set.toList model.tags)
                 )
             ]
         ]
