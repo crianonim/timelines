@@ -4,6 +4,7 @@ import Date exposing (Date)
 import Http
 import Json.Decode
 import Json.Encode
+import Set exposing (Set)
 import Time
 
 
@@ -37,8 +38,7 @@ type alias Timeline =
     { id : Int
     , period : Period
     , name : String
-    , tags : List String
-    , tagIds : List Int
+    , tags : Set String
     }
 
 
@@ -270,7 +270,7 @@ toString { period, name, tags } =
         ++ " "
         ++ periodToString period
         ++ " ("
-        ++ String.join ", " tags
+        ++ String.join ", " (Set.toList tags)
         ++ " )"
 
 
@@ -287,14 +287,14 @@ representationHeader =
 getTimelines : (Result Http.Error (List Timeline) -> msg) -> Cmd msg
 getTimelines wrapMsg =
     Http.get
-        { url = api ++ "/tagged_timelines"
+        { url = api ++ "/timelines"
         , expect =
             Http.expectJson wrapMsg <|
                 Json.Decode.list decodeTimeline
         }
 
 
-saveNewTimeline : { name : String, period : Period } -> (Result Http.Error Timeline -> msg) -> Cmd msg
+saveNewTimeline : { name : String, period : Period, tags : Set String } -> (Result Http.Error Timeline -> msg) -> Cmd msg
 saveNewTimeline timeline wrapMsg =
     Http.request
         { method = "POST"
@@ -307,13 +307,13 @@ saveNewTimeline timeline wrapMsg =
         }
 
 
-saveEditTimeline : { name : String, period : Period, id : Int } -> (Result Http.Error Timeline -> msg) -> Cmd msg
-saveEditTimeline { name, period, id } wrapMsg =
+saveEditTimeline : { name : String, period : Period, tags : Set String, id : Int } -> (Result Http.Error Timeline -> msg) -> Cmd msg
+saveEditTimeline { name, period, tags, id } wrapMsg =
     Http.request
         { method = "PATCH"
         , headers = [ representationHeader ]
         , url = api ++ "/timelines?id=eq." ++ String.fromInt id
-        , body = Http.jsonBody <| encodeTimeline { name = name, period = period }
+        , body = Http.jsonBody <| encodeTimeline { name = name, period = period, tags = tags }
         , expect = Http.expectJson wrapMsg <| Json.Decode.index 0 decodeTimeline
         , timeout = Nothing
         , tracker = Nothing
@@ -338,11 +338,12 @@ encodePeriod period =
     periodToString period |> Json.Encode.string
 
 
-encodeTimeline : { name : String, period : Period } -> Json.Encode.Value
-encodeTimeline { name, period } =
+encodeTimeline : { name : String, period : Period, tags : Set String } -> Json.Encode.Value
+encodeTimeline { name, period, tags } =
     Json.Encode.object <|
         [ ( "period", encodePeriod period )
         , ( "name", Json.Encode.string name )
+        , ( "tags", Json.Encode.list Json.Encode.string (Set.toList tags) )
         ]
 
 
@@ -401,12 +402,11 @@ decodePeriod =
 
 decodeTimeline : Json.Decode.Decoder Timeline
 decodeTimeline =
-    Json.Decode.map5 Timeline
+    Json.Decode.map4 Timeline
         (Json.Decode.field "id" Json.Decode.int)
         (Json.Decode.field "period" decodePeriod)
         (Json.Decode.field "name" Json.Decode.string)
-        (Json.Decode.map (Maybe.withDefault []) <| Json.Decode.maybe <| Json.Decode.field "tags" <| Json.Decode.list Json.Decode.string)
-        (Json.Decode.map (Maybe.withDefault []) <| Json.Decode.maybe <| Json.Decode.field "tag_ids" <| Json.Decode.list Json.Decode.int)
+        (Json.Decode.map (Maybe.withDefault [] >> Set.fromList) <| Json.Decode.maybe <| Json.Decode.field "tags" <| Json.Decode.list Json.Decode.string)
 
 
 

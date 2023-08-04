@@ -5,6 +5,7 @@ import Html exposing (Attribute, Html, a, div, h1, h2, text)
 import Html.Attributes as Attrs exposing (href, style, title)
 import Html.Events as Events
 import Http
+import Set exposing (Set)
 import Time
 import Timeline.API exposing (Era, Period(..), PeriodType(..), Tag, TimePoint(..), Timeline, Viewport)
 
@@ -14,12 +15,12 @@ type alias Model =
     , viewPort : Viewport
     , newTimelinePeriod : Period
     , newTimelineName : String
-    , newTimelineTags : List Int
+    , newTimelineTags : Set String
     , isEditingId : Maybe Int
     , eras : List Era
     , selectedEra : Maybe Era
     , newEraName : String
-    , tags : List Tag
+    , tags : Set String
     }
 
 
@@ -29,7 +30,7 @@ type Msg
     | GotTimelines (Result Http.Error (List Timeline))
     | UpdatePeriod Period
     | UpdateNewTimelineName String
-    | SaveTimeline (Maybe Int) Period String
+    | SaveTimeline (Maybe Int) Period String (Set String)
     | SavedTimeline (Maybe Int) (Result Http.Error Timeline)
     | RemoveTimeline Int
     | RemovedTimeline Int (Result Http.Error ())
@@ -42,8 +43,7 @@ type Msg
     | AddNewEra
     | SavedNewEra (Result Http.Error Era)
     | GotEras (Result Http.Error (List Era))
-    | GotTags (Result Http.Error (List Tag))
-    | ToggleTag Bool Int
+    | ToggleTag Bool String
 
 
 init : ( Model, Cmd Msg )
@@ -52,14 +52,14 @@ init =
       , viewPort = exampleVP
       , newTimelinePeriod = Point <| Year 2023
       , newTimelineName = ""
-      , newTimelineTags = []
+      , newTimelineTags = Set.empty
       , isEditingId = Nothing
       , eras = []
       , selectedEra = Nothing
       , newEraName = ""
-      , tags = []
+      , tags = Set.empty
       }
-    , Cmd.batch [ Timeline.API.getTimelines GotTimelines, Timeline.API.getEras GotEras, Timeline.API.getTags GotTags ]
+    , Cmd.batch [ Timeline.API.getTimelines GotTimelines, Timeline.API.getEras GotEras ]
     )
 
 
@@ -90,14 +90,14 @@ update msg model =
             , Cmd.none
             )
 
-        SaveTimeline mId period name ->
+        SaveTimeline mId period name tags ->
             ( model
             , case mId of
                 Nothing ->
-                    Timeline.API.saveNewTimeline { name = name, period = period } (SavedTimeline mId)
+                    Timeline.API.saveNewTimeline { name = name, period = period, tags = tags } (SavedTimeline mId)
 
                 Just id ->
-                    Timeline.API.saveEditTimeline { id = id, name = name, period = period } (SavedTimeline mId)
+                    Timeline.API.saveEditTimeline { id = id, name = name, period = period, tags = tags } (SavedTimeline mId)
             )
 
         SavedTimeline mId (Ok tl) ->
@@ -133,7 +133,12 @@ update msg model =
         GotTimelines result ->
             case result of
                 Ok timelines ->
-                    ( { model | timelines = timelines }, Cmd.none )
+                    ( { model
+                        | timelines = timelines
+                        , tags = Set.fromList <| List.concatMap (.tags >> Set.toList) timelines
+                      }
+                    , Cmd.none
+                    )
 
                 Err e ->
                     let
@@ -178,7 +183,7 @@ update msg model =
                         | isEditingId = Just id
                         , newTimelineName = timeline.name
                         , newTimelinePeriod = timeline.period
-                        , newTimelineTags = timeline.tagIds
+                        , newTimelineTags = timeline.tags
                     }
             , Cmd.none
             )
@@ -271,24 +276,14 @@ update msg model =
             in
             ( model, Cmd.none )
 
-        GotTags (Ok tags) ->
-            ( { model | tags = tags }, Cmd.none )
-
-        GotTags (Err err) ->
-            let
-                _ =
-                    Debug.log "Error in getting tags" err
-            in
-            ( model, Cmd.none )
-
-        ToggleTag toggled tagId ->
+        ToggleTag toggled tag ->
             let
                 newTags =
                     if toggled then
-                        tagId :: model.newTimelineTags
+                        Set.insert tag model.newTimelineTags
 
                     else
-                        List.filter (\t -> t /= tagId) model.newTimelineTags
+                        Set.remove tag model.newTimelineTags
             in
             ( { model | newTimelineTags = newTags }, Cmd.none )
 
@@ -640,16 +635,16 @@ viewTimepointSelector config =
         ]
 
 
-viewNewTimeline : Model -> Period -> String -> List Int -> Maybe Int -> Html Msg
+viewNewTimeline : Model -> Period -> String -> Set String -> Maybe Int -> Html Msg
 viewNewTimeline model period name tags isEditingId =
     let
         ( message, buttonLabel ) =
             case isEditingId of
                 Just id ->
-                    ( SaveTimeline (Just id) period name, "Save" )
+                    ( SaveTimeline (Just id) period name tags, "Save" )
 
                 Nothing ->
-                    ( SaveTimeline Nothing period name, "New" )
+                    ( SaveTimeline Nothing period name tags, "New" )
     in
     Html.div []
         [ Html.div [ Attrs.class "flex gap-4" ]
@@ -705,7 +700,10 @@ viewNewTimeline model period name tags isEditingId =
             ]
         , Html.div [] [ Html.text "TAGS" ]
         , div []
-            [ div [ Attrs.class "flex gap-4" ] (List.map (\tag -> Html.div [ Attrs.class "flex gap-1" ] [ Html.input [ Attrs.type_ "checkbox", Attrs.checked (List.member tag.id tags), Events.onClick <| ToggleTag (not (List.member tag.id tags)) tag.id ] [], Html.text tag.name ]) model.tags)
+            [ div [ Attrs.class "flex gap-4" ]
+                (List.map (\tag -> Html.div [ Attrs.class "flex gap-1" ] [ Html.input [ Attrs.type_ "checkbox", Attrs.checked (Set.member tag tags), Events.onClick <| ToggleTag (not (Set.member tag tags)) tag ] [], Html.text tag ])
+                    (Set.toList model.tags)
+                )
             ]
         ]
 
