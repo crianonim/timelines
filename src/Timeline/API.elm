@@ -49,12 +49,6 @@ type alias Era =
     }
 
 
-type alias Tag =
-    { id : Int
-    , name : String
-    }
-
-
 periodToPeriodType : Period -> PeriodType
 periodToPeriodType period =
     case period of
@@ -473,24 +467,3 @@ getEras wrapMsg =
             Http.expectJson wrapMsg <|
                 Json.Decode.list decodeEra
         }
-
-
-
---- Tags
-
-
-getTags : (Result Http.Error (List Tag) -> msg) -> Cmd msg
-getTags wrapMsg =
-    Http.get
-        { url = api ++ "/tags"
-        , expect =
-            Http.expectJson wrapMsg <|
-                Json.Decode.list decodeTag
-        }
-
-
-decodeTag : Json.Decode.Decoder Tag
-decodeTag =
-    Json.Decode.map2 Tag
-        (Json.Decode.field "id" Json.Decode.int)
-        (Json.Decode.field "name" Json.Decode.string)

@@ -7,7 +7,7 @@ import Html.Events as Events
 import Http
 import Set exposing (Set)
 import Time
-import Timeline.API exposing (Era, Period(..), PeriodType(..), Tag, TimePoint(..), Timeline, Viewport)
+import Timeline.API exposing (Era, Period(..), PeriodType(..), TimePoint(..), Timeline, Viewport)
 
 
 type alias Model =
