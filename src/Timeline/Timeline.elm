@@ -21,6 +21,7 @@ type alias Model =
     , selectedEra : Maybe Era
     , newEraName : String
     , tags : Set String
+    , selectedTag : Maybe String
     }
 
 
@@ -44,6 +45,7 @@ type Msg
     | SavedNewEra (Result Http.Error Era)
     | GotEras (Result Http.Error (List Era))
     | ToggleTag Bool String
+    | SelectTag String
 
 
 init : ( Model, Cmd Msg )
@@ -58,6 +60,7 @@ init =
       , selectedEra = Nothing
       , newEraName = ""
       , tags = Set.empty
+      , selectedTag = Nothing
       }
     , Cmd.batch [ Timeline.API.getTimelines GotTimelines, Timeline.API.getEras GotEras ]
     )
@@ -287,6 +290,19 @@ update msg model =
             in
             ( { model | newTimelineTags = newTags }, Cmd.none )
 
+        SelectTag tag ->
+            let
+                selectedTag =
+                    model.tags
+                        |> Set.toList
+                        |> List.filter
+                            (\e -> e == tag)
+                        |> List.head
+            in
+            ( { model | selectedTag = selectedTag }
+            , Cmd.none
+            )
+
 
 type alias TimeLineBar =
     { start : Maybe Float
@@ -488,6 +504,7 @@ view model =
             , viewTimepointSelector { onSelected = UpdateEnd, timepoint = model.viewPort.end }
             , viewEras model.eras model.selectedEra model.newEraName
             ]
+        , viewTagSelect model.tags model.selectedTag
         , div
             [ Attrs.class "border border-slate-500  m-2"
             ]
@@ -502,7 +519,16 @@ view model =
                         , Html.div [ Attrs.class "text-sm" ] [ viewTimeline tl ]
                         ]
                 )
-                (List.filter (.period >> isInViewport model.viewPort) model.timelines)
+                (List.filter (.period >> isInViewport model.viewPort) model.timelines
+                    |> (\filtered ->
+                            case model.selectedTag of
+                                Nothing ->
+                                    filtered
+
+                                Just tag ->
+                                    filtered |> List.filter (\timeline -> Set.member tag timeline.tags)
+                       )
+                )
             )
 
         --, h2 [] [ text "> Visible" ]
@@ -725,4 +751,23 @@ viewEras eras maybeEra newEraName =
             )
         , Html.input [ Events.onInput UpdateNewEraName, Attrs.value newEraName ] []
         , Html.button [ Events.onClick AddNewEra ] [ Html.text "New Era" ]
+        ]
+
+
+viewTagSelect : Set String -> Maybe String -> Html Msg
+viewTagSelect tags selectedTag =
+    Html.div []
+        [ Html.text "Selected Tag"
+        , Html.select [ Events.onInput SelectTag ]
+            (Html.option [] [ Html.text "--" ]
+                :: List.map
+                    (\e ->
+                        Html.option
+                            [ Attrs.value e
+                            , Attrs.selected (Just e == selectedTag)
+                            ]
+                            [ Html.text e ]
+                    )
+                    (Set.toList tags)
+            )
         ]
