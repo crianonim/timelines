@@ -33,3 +33,17 @@ public.eras (name,erastart,eraend)
 values
 ('Wszystko','1789','2024-07-03'),
 ('Test','2020-03-13','2023');
+
+insert into
+public.tags (name)
+values
+('To study'),
+('Tag2');
+
+insert into
+public.timeline_tag (timeline_id, tag_id)
+values
+(1,1),
+(2,2),
+(3,2),
+(3,1);

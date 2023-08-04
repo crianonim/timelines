@@ -37,6 +37,8 @@ type alias Timeline =
     { id : Int
     , period : Period
     , name : String
+    , tags : List String
+    , tagIds : List Int
     }
 
 
@@ -44,6 +46,12 @@ type alias Era =
     { id : Int
     , name : String
     , viewPort : Viewport
+    }
+
+
+type alias Tag =
+    { id : Int
+    , name : String
     }
 
 
@@ -257,10 +265,13 @@ periodToString period =
 
 
 toString : Timeline -> String
-toString { period, name } =
+toString { period, name, tags } =
     name
         ++ " "
         ++ periodToString period
+        ++ " ("
+        ++ String.join ", " tags
+        ++ " )"
 
 
 api : String
@@ -276,14 +287,14 @@ representationHeader =
 getTimelines : (Result Http.Error (List Timeline) -> msg) -> Cmd msg
 getTimelines wrapMsg =
     Http.get
-        { url = api ++ "/timelines"
+        { url = api ++ "/tagged_timelines"
         , expect =
             Http.expectJson wrapMsg <|
                 Json.Decode.list decodeTimeline
         }
 
 
-saveNewTimeline : Timeline -> (Result Http.Error Timeline -> msg) -> Cmd msg
+saveNewTimeline : { name : String, period : Period } -> (Result Http.Error Timeline -> msg) -> Cmd msg
 saveNewTimeline timeline wrapMsg =
     Http.request
         { method = "POST"
@@ -296,13 +307,13 @@ saveNewTimeline timeline wrapMsg =
         }
 
 
-saveEditTimeline : Timeline -> (Result Http.Error Timeline -> msg) -> Cmd msg
-saveEditTimeline timeline wrapMsg =
+saveEditTimeline : { name : String, period : Period, id : Int } -> (Result Http.Error Timeline -> msg) -> Cmd msg
+saveEditTimeline { name, period, id } wrapMsg =
     Http.request
         { method = "PATCH"
         , headers = [ representationHeader ]
-        , url = api ++ "/timelines?id=eq." ++ String.fromInt timeline.id
-        , body = Http.jsonBody <| encodeTimeline timeline
+        , url = api ++ "/timelines?id=eq." ++ String.fromInt id
+        , body = Http.jsonBody <| encodeTimeline { name = name, period = period }
         , expect = Http.expectJson wrapMsg <| Json.Decode.index 0 decodeTimeline
         , timeout = Nothing
         , tracker = Nothing
@@ -327,11 +338,11 @@ encodePeriod period =
     periodToString period |> Json.Encode.string
 
 
-encodeTimeline : Timeline -> Json.Encode.Value
-encodeTimeline timeline =
+encodeTimeline : { name : String, period : Period } -> Json.Encode.Value
+encodeTimeline { name, period } =
     Json.Encode.object <|
-        [ ( "period", encodePeriod timeline.period )
-        , ( "name", Json.Encode.string timeline.name )
+        [ ( "period", encodePeriod period )
+        , ( "name", Json.Encode.string name )
         ]
 
 
@@ -390,10 +401,12 @@ decodePeriod =
 
 decodeTimeline : Json.Decode.Decoder Timeline
 decodeTimeline =
-    Json.Decode.map3 Timeline
+    Json.Decode.map5 Timeline
         (Json.Decode.field "id" Json.Decode.int)
         (Json.Decode.field "period" decodePeriod)
         (Json.Decode.field "name" Json.Decode.string)
+        (Json.Decode.map (Maybe.withDefault []) <| Json.Decode.maybe <| Json.Decode.field "tags" <| Json.Decode.list Json.Decode.string)
+        (Json.Decode.map (Maybe.withDefault []) <| Json.Decode.maybe <| Json.Decode.field "tag_ids" <| Json.Decode.list Json.Decode.int)
 
 
 
@@ -460,3 +473,24 @@ getEras wrapMsg =
             Http.expectJson wrapMsg <|
                 Json.Decode.list decodeEra
         }
+
+
+
+--- Tags
+
+
+getTags : (Result Http.Error (List Tag) -> msg) -> Cmd msg
+getTags wrapMsg =
+    Http.get
+        { url = api ++ "/tags"
+        , expect =
+            Http.expectJson wrapMsg <|
+                Json.Decode.list decodeTag
+        }
+
+
+decodeTag : Json.Decode.Decoder Tag
+decodeTag =
+    Json.Decode.map2 Tag
+        (Json.Decode.field "id" Json.Decode.int)
+        (Json.Decode.field "name" Json.Decode.string)

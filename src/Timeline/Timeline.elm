@@ -6,7 +6,7 @@ import Html.Attributes as Attrs exposing (href, style, title)
 import Html.Events as Events
 import Http
 import Time
-import Timeline.API exposing (Era, Period(..), PeriodType(..), TimePoint(..), Timeline, Viewport)
+import Timeline.API exposing (Era, Period(..), PeriodType(..), Tag, TimePoint(..), Timeline, Viewport)
 
 
 type alias Model =
@@ -14,10 +14,12 @@ type alias Model =
     , viewPort : Viewport
     , newTimelinePeriod : Period
     , newTimelineName : String
+    , newTimelineTags : List Int
     , isEditingId : Maybe Int
     , eras : List Era
     , selectedEra : Maybe Era
     , newEraName : String
+    , tags : List Tag
     }
 
 
@@ -40,6 +42,8 @@ type Msg
     | AddNewEra
     | SavedNewEra (Result Http.Error Era)
     | GotEras (Result Http.Error (List Era))
+    | GotTags (Result Http.Error (List Tag))
+    | ToggleTag Bool Int
 
 
 init : ( Model, Cmd Msg )
@@ -48,12 +52,14 @@ init =
       , viewPort = exampleVP
       , newTimelinePeriod = Point <| Year 2023
       , newTimelineName = ""
+      , newTimelineTags = []
       , isEditingId = Nothing
       , eras = []
       , selectedEra = Nothing
       , newEraName = ""
+      , tags = []
       }
-    , Cmd.batch [ Timeline.API.getTimelines GotTimelines, Timeline.API.getEras GotEras ]
+    , Cmd.batch [ Timeline.API.getTimelines GotTimelines, Timeline.API.getEras GotEras, Timeline.API.getTags GotTags ]
     )
 
 
@@ -88,7 +94,7 @@ update msg model =
             ( model
             , case mId of
                 Nothing ->
-                    Timeline.API.saveNewTimeline { id = 0, name = name, period = period } (SavedTimeline mId)
+                    Timeline.API.saveNewTimeline { name = name, period = period } (SavedTimeline mId)
 
                 Just id ->
                     Timeline.API.saveEditTimeline { id = id, name = name, period = period } (SavedTimeline mId)
@@ -172,6 +178,7 @@ update msg model =
                         | isEditingId = Just id
                         , newTimelineName = timeline.name
                         , newTimelinePeriod = timeline.period
+                        , newTimelineTags = timeline.tagIds
                     }
             , Cmd.none
             )
@@ -264,6 +271,27 @@ update msg model =
             in
             ( model, Cmd.none )
 
+        GotTags (Ok tags) ->
+            ( { model | tags = tags }, Cmd.none )
+
+        GotTags (Err err) ->
+            let
+                _ =
+                    Debug.log "Error in getting tags" err
+            in
+            ( model, Cmd.none )
+
+        ToggleTag toggled tagId ->
+            let
+                newTags =
+                    if toggled then
+                        tagId :: model.newTimelineTags
+
+                    else
+                        List.filter (\t -> t /= tagId) model.newTimelineTags
+            in
+            ( { model | newTimelineTags = newTags }, Cmd.none )
+
 
 type alias TimeLineBar =
     { start : Maybe Float
@@ -272,20 +300,22 @@ type alias TimeLineBar =
     }
 
 
-data : List Timeline
-data =
-    [ Timeline 0 (Point <| YearMonthDay 1980 Time.Jun 6) "Jan's Birthday"
-    , Timeline 1 (Closed (Year 1995) (Year 1999)) "High School"
-    , Timeline 2 (Started (Year 2019)) "Working in Permutive"
-    , Timeline 3 (Closed (Year 1952) (Year 2022)) "Queen Elizabeth II reign"
-    , Timeline 4 (Started (Year 2005)) "Moved to the UK"
-    , Timeline 5 (Closed (Year 1789) (Year 1795)) "French Revolution"
-    , Timeline 6 (Closed (Year 2014) (Year 2018)) "Lived in Clapham"
-    , Timeline 7 (Finished (Year 1985)) "Finished in 1985"
-    , Timeline 8 (Point <| YearMonthDay 2023 Time.Apr 6) "Left Permutive"
-    , Timeline 9 (Point <| Year 2022) "Bad Year"
-    , Timeline 10 (Point <| YearMonth 2023 Time.Jun) "Pride Month"
-    ]
+
+--
+--data : List Timeline
+--data =
+--    [ Timeline 0 (Point <| YearMonthDay 1980 Time.Jun 6) "Jan's Birthday"
+--    , Timeline 1 (Closed (Year 1995) (Year 1999)) "High School"
+--    , Timeline 2 (Started (Year 2019)) "Working in Permutive"
+--    , Timeline 3 (Closed (Year 1952) (Year 2022)) "Queen Elizabeth II reign"
+--    , Timeline 4 (Started (Year 2005)) "Moved to the UK"
+--    , Timeline 5 (Closed (Year 1789) (Year 1795)) "French Revolution"
+--    , Timeline 6 (Closed (Year 2014) (Year 2018)) "Lived in Clapham"
+--    , Timeline 7 (Finished (Year 1985)) "Finished in 1985"
+--    , Timeline 8 (Point <| YearMonthDay 2023 Time.Apr 6) "Left Permutive"
+--    , Timeline 9 (Point <| Year 2022) "Bad Year"
+--    , Timeline 10 (Point <| YearMonth 2023 Time.Jun) "Pride Month"
+--    ]
 
 
 isInViewport : Viewport -> Period -> Bool
@@ -453,7 +483,7 @@ view model =
         [ h1 [ Attrs.class "text-xl mb-4" ]
             [ text "Welcome to Timelines"
             ]
-        , div [] [ viewNewTimeline model.newTimelinePeriod model.newTimelineName model.isEditingId ]
+        , div [] [ viewNewTimeline model model.newTimelinePeriod model.newTimelineName model.newTimelineTags model.isEditingId ]
         , div [ Attrs.class "flex gap-4" ]
             [ Html.button [ Events.onClick AllPeriods ] [ Html.text "ALL" ]
             , Html.button [ Events.onClick Sort ] [ Html.text "Sort" ]
@@ -610,8 +640,8 @@ viewTimepointSelector config =
         ]
 
 
-viewNewTimeline : Period -> String -> Maybe Int -> Html Msg
-viewNewTimeline period name isEditingId =
+viewNewTimeline : Model -> Period -> String -> List Int -> Maybe Int -> Html Msg
+viewNewTimeline model period name tags isEditingId =
     let
         ( message, buttonLabel ) =
             case isEditingId of
@@ -621,56 +651,62 @@ viewNewTimeline period name isEditingId =
                 Nothing ->
                     ( SaveTimeline Nothing period name, "New" )
     in
-    Html.div [ Attrs.class "flex gap-4" ]
-        [ Html.input [ Events.onInput UpdateNewTimelineName, Attrs.value name ] []
-        , Html.select
-            [ Events.onInput
-                (\t ->
-                    UpdatePeriod
-                        (case t of
-                            "Point" ->
-                                Point (Timeline.API.firstTimePointOfPeriod period)
+    Html.div []
+        [ Html.div [ Attrs.class "flex gap-4" ]
+            [ Html.input [ Events.onInput UpdateNewTimelineName, Attrs.value name ] []
+            , Html.select
+                [ Events.onInput
+                    (\t ->
+                        UpdatePeriod
+                            (case t of
+                                "Point" ->
+                                    Point (Timeline.API.firstTimePointOfPeriod period)
 
-                            "Closed" ->
-                                Closed (Timeline.API.firstTimePointOfPeriod period) (Timeline.API.firstTimePointOfPeriod period)
+                                "Closed" ->
+                                    Closed (Timeline.API.firstTimePointOfPeriod period) (Timeline.API.firstTimePointOfPeriod period)
 
-                            "Started" ->
-                                Started (Timeline.API.firstTimePointOfPeriod period)
+                                "Started" ->
+                                    Started (Timeline.API.firstTimePointOfPeriod period)
 
-                            "Finished" ->
-                                Finished (Timeline.API.firstTimePointOfPeriod period)
+                                "Finished" ->
+                                    Finished (Timeline.API.firstTimePointOfPeriod period)
 
-                            _ ->
-                                period
-                        )
-                )
-            ]
-            [ Html.option [ Attrs.selected (Timeline.API.periodToPeriodType period == PointType) ] [ Html.text "Point" ]
-            , Html.option
-                [ Attrs.selected (Timeline.API.periodToPeriodType period == ClosedType)
+                                _ ->
+                                    period
+                            )
+                    )
                 ]
-                [ Html.text "Closed" ]
-            , Html.option [ Attrs.selected (Timeline.API.periodToPeriodType period == StartedType) ] [ Html.text "Started" ]
-            , Html.option [ Attrs.selected (Timeline.API.periodToPeriodType period == FinishedType) ] [ Html.text "Finished" ]
-            ]
-        , case period of
-            Point tp ->
-                viewTimepointSelector { timepoint = tp, onSelected = Point >> UpdatePeriod }
-
-            Closed t1 t2 ->
-                Html.div [ Attrs.class "flex gap-4" ]
-                    [ viewTimepointSelector { timepoint = t1, onSelected = \s -> UpdatePeriod (Closed s t2) }
-                    , viewTimepointSelector { timepoint = t2, onSelected = \s -> UpdatePeriod (Closed t1 s) }
+                [ Html.option [ Attrs.selected (Timeline.API.periodToPeriodType period == PointType) ] [ Html.text "Point" ]
+                , Html.option
+                    [ Attrs.selected (Timeline.API.periodToPeriodType period == ClosedType)
                     ]
+                    [ Html.text "Closed" ]
+                , Html.option [ Attrs.selected (Timeline.API.periodToPeriodType period == StartedType) ] [ Html.text "Started" ]
+                , Html.option [ Attrs.selected (Timeline.API.periodToPeriodType period == FinishedType) ] [ Html.text "Finished" ]
+                ]
+            , case period of
+                Point tp ->
+                    viewTimepointSelector { timepoint = tp, onSelected = Point >> UpdatePeriod }
 
-            Started timePoint ->
-                viewTimepointSelector { timepoint = timePoint, onSelected = Started >> UpdatePeriod }
+                Closed t1 t2 ->
+                    Html.div [ Attrs.class "flex gap-4" ]
+                        [ viewTimepointSelector { timepoint = t1, onSelected = \s -> UpdatePeriod (Closed s t2) }
+                        , viewTimepointSelector { timepoint = t2, onSelected = \s -> UpdatePeriod (Closed t1 s) }
+                        ]
 
-            Finished timePoint ->
-                viewTimepointSelector { timepoint = timePoint, onSelected = Finished >> UpdatePeriod }
+                Started timePoint ->
+                    viewTimepointSelector { timepoint = timePoint, onSelected = Started >> UpdatePeriod }
 
-        --, viewTimepointSelector { timepoint = firstTimePointOfPeriod period, onSelected = UpdateNewTimelinePeriod }
-        , Html.button [ Events.onClick message ] [ Html.text buttonLabel ]
+                Finished timePoint ->
+                    viewTimepointSelector { timepoint = timePoint, onSelected = Finished >> UpdatePeriod }
+
+            --, viewTimepointSelector { timepoint = firstTimePointOfPeriod period, onSelected = UpdateNewTimelinePeriod }
+            , Html.button [ Events.onClick message ] [ Html.text buttonLabel ]
+            ]
+        , Html.div [] [ Html.text "TAGS" ]
+        , div []
+            [ div [ Attrs.class "flex gap-4" ] (List.map (\tag -> Html.div [ Attrs.class "flex gap-1" ] [ Html.input [ Attrs.type_ "checkbox", Attrs.checked (List.member tag.id tags), Events.onClick <| ToggleTag (not (List.member tag.id tags)) tag.id ] [], Html.text tag.name ]) model.tags)
+            ]
         ]
 
 
